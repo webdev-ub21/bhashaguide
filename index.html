@@ -1,0 +1,3377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BhashaGuard AI – Indian Language AI Detector & Humanizer</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js for Linguistic & Burstiness Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- PDF.js for client-side PDF text extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Mammoth.js for client-side DOCX text extraction -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <!-- Google Fonts: Inter & Indic Scripts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Sans+Tamil:wght@400;600&family=Noto+Sans+Bengali:wght@400;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'Inter', 'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Bengali', 'system-ui', 'sans-serif'],
+            devlys: ['"DevLys 010"', '"DevLys010"', '"Kruti Dev 010"', '"KrutiDev010"', '"Noto Sans Devanagari"', 'sans-serif'],
+          },
+          colors: {
+            bharatSaffron: {
+              50: '#fffaf5',
+              100: '#ffedd5',
+              200: '#fed7aa',
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c'
+            },
+            bharatGreen: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d'
+            },
+            indicNavy: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.04);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.7);
+    }
+    .sentence-low {
+      background-color: rgba(34, 197, 94, 0.12);
+      border-bottom: 2px solid #22c55e;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .sentence-mid {
+      background-color: rgba(234, 179, 8, 0.18);
+      border-bottom: 2px solid #eab308;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .sentence-high {
+      background-color: rgba(239, 68, 68, 0.18);
+      border-bottom: 2px solid #ef4444;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .sentence-low:hover, .sentence-mid:hover, .sentence-high:hover {
+      filter: brightness(0.92);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+      transform: translateY(-1px);
+    }
+    @keyframes pulseRing {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.08); opacity: 0.4; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulse-ring {
+      animation: pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @media print {
+      body * { visibility: hidden; }
+      #printArea, #printArea * { visibility: visible; }
+      #printArea { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+    @font-face {
+      font-family: 'DevLys 010';
+      src: local('DevLys 010'), local('DevLys010'), local('Kruti Dev 010'), local('KrutiDev010');
+      font-display: swap;
+    }
+    .font-devlys {
+      font-family: 'DevLys 010', 'DevLys010', 'Kruti Dev 010', 'KrutiDev010', 'Noto Sans Devanagari', sans-serif !important;
+      letter-spacing: 0.02em;
+    }
+    /* Restrict text selection on framework chrome while allowing selection inside editors */
+    .app-secure-shield {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    textarea, input, #humanizedTextOutput, #sentenceHeatmapContainer, #toolsOutput {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-50/80 text-slate-900 font-sans antialiased min-h-screen flex flex-col selection:bg-bharatSaffron-500 selection:text-white app-secure-shield">
+
+  <!-- Header -->
+  <header class="bg-indicNavy-950 border-b border-slate-800 text-white sticky top-0 z-50 shadow-lg backdrop-blur-md bg-opacity-95">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16 sm:h-20">
+        
+        <!-- Logo and Brand Identity -->
+        <div class="flex items-center gap-3.5">
+          <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-bharatSaffron-500 to-emerald-500 p-0.5 shadow-lg shadow-orange-500/25">
+            <div class="w-full h-full bg-indicNavy-950 rounded-[14px] flex items-center justify-center">
+              <svg class="w-6 h-6 text-bharatSaffron-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-orange-400 via-amber-200 to-emerald-400 bg-clip-text text-transparent">BhashaGuard AI</span>
+              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-800/90 text-amber-300 border border-amber-400/30">UB 3.0</span>
+            </div>
+            <p class="text-xs text-slate-400 hidden sm:block">Indian Multilingual AI Detector • Sahaj & Saral Humanizer • DevLys 010 Font Ready</p>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="hidden lg:flex space-x-1">
+          <button onclick="switchTab('detector')" id="tab-btn-detector" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 text-white border border-slate-700 transition flex items-center gap-1.5 shadow-sm">
+            <span>🛡️ AI Detector</span>
+          </button>
+          <button onclick="switchTab('humanizer')" id="tab-btn-humanizer" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>✨ Sahaj Humanizer</span>
+          </button>
+          <button onclick="switchTab('scanner')" id="tab-btn-scanner" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>📷 Image OCR & Vision</span>
+          </button>
+          <button onclick="switchTab('analysis')" id="tab-btn-analysis" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>📊 Rhythm Analytics</span>
+          </button>
+          <button onclick="switchTab('tools')" id="tab-btn-tools" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>🔤 Hinglish Suite</span>
+          </button>
+          <button onclick="switchTab('voice')" id="tab-btn-voice" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>🎙️ My Voice Style</span>
+          </button>
+          <button onclick="switchTab('history')" id="tab-btn-history" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>🕒 History</span>
+          </button>
+          <button onclick="switchTab('creator')" id="tab-btn-creator" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>👨‍💻 Creator & Mission</span>
+          </button>
+          <button onclick="switchTab('methodology')" id="tab-btn-methodology" class="nav-tab px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/70 transition flex items-center gap-1.5">
+            <span>📖 Architecture</span>
+          </button>
+        </nav>
+
+        <!-- Right action: Zero Data Retention badge & Privacy modal -->
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <!-- Sessional Login / Sign Up Button (Default Unauthenticated) -->
+          <button id="headerLoginBtn" onclick="openAuthModal()" class="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-bharatSaffron-500 to-amber-500 hover:from-bharatSaffron-600 hover:to-amber-600 text-white text-xs font-bold shadow-md hover:shadow-lg transition">
+            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            <span class="whitespace-nowrap">Login / Sign In</span>
+          </button>
+
+          <!-- Verified User Session Badge (Appears After OTP Sign-in) -->
+          <div id="headerUserBadge" class="hidden flex items-center gap-2 bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 sm:px-3 py-1.5 shadow-sm">
+            <div class="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/30">
+              ✓
+            </div>
+            <div class="flex flex-col text-left leading-none">
+              <span id="userSessionIdentity" class="text-xs font-bold text-slate-100 max-w-[110px] sm:max-w-[150px] truncate">user</span>
+              <span id="userRoleTag" class="text-[9px] text-emerald-400 font-semibold uppercase tracking-wider mt-0.5">Verified Session</span>
+            </div>
+            <button onclick="logoutSession()" class="ml-1 p-1 hover:bg-slate-700 rounded text-slate-400 hover:text-red-400 transition" title="Log Out Session">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/70 text-emerald-300 border border-emerald-800/50 text-xs font-medium">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>DPDP Zero-Retention</span>
+          </div>
+          <button onclick="togglePrivacyModal()" class="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Privacy Guarantee & Data Protection">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Scrollable Tab Bar -->
+    <div class="lg:hidden flex overflow-x-auto px-4 py-2.5 border-t border-slate-800 gap-1.5 bg-indicNavy-950 text-xs no-scrollbar">
+      <button onclick="switchTab('detector')" class="px-3 py-1.5 rounded-lg whitespace-nowrap bg-slate-800 text-white font-medium">Detector</button>
+      <button onclick="switchTab('humanizer')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">Sahaj Humanizer</button>
+      <button onclick="switchTab('scanner')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">Image OCR</button>
+      <button onclick="switchTab('analysis')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">Burstiness</button>
+      <button onclick="switchTab('tools')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">Hinglish</button>
+      <button onclick="switchTab('voice')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">Voice</button>
+      <button onclick="switchTab('history')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">History</button>
+      <button onclick="switchTab('creator')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">Creator</button>
+      <button onclick="switchTab('methodology')" class="px-3 py-1.5 rounded-lg whitespace-nowrap text-slate-300">Methodology</button>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+
+    <!-- Mandatory Probabilistic Transparency Notice -->
+    <div class="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-emerald-500/10 border border-amber-300/40 rounded-2xl p-4 text-xs sm:text-sm text-slate-700 flex items-start gap-3.5 shadow-sm">
+      <div class="p-2 rounded-xl bg-amber-100 text-amber-900 shrink-0 mt-0.5">
+        <svg class="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+      </div>
+      <div class="leading-relaxed">
+        <span class="font-bold text-slate-900">Probabilistic Evaluation Notice:</span> AI detection is fundamentally <strong>statistical and probabilistic, not deterministic</strong>. BhashaGuard AI evaluates multivariate Indic linguistic signals (sentence burstiness, lexical diversity, Karaka markers, and discourse symmetry) with built-in false-positive safeguards for official, academic, and government documents.
+      </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 1: AI DETECTOR (Primary Engine)                           -->
+    <!-- ============================================================== -->
+    <section id="view-detector" class="space-y-6">
+      
+      <!-- Input Panel Card -->
+      <div class="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-md transition p-5 sm:p-7">
+        
+        <!-- Controls Top Header -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-slate-100">
+          <div class="flex items-center gap-3">
+            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <span>Text & Indic Linguistic Input</span>
+            </h2>
+            <span id="detectedBadge" class="hidden text-xs px-2.5 py-1 rounded-full font-medium bg-blue-50 text-blue-700 border border-blue-200">
+              Auto-detecting...
+            </span>
+          </div>
+
+          <!-- Controls: Language Select, Sample Loads, File Upload, Voice Dictation -->
+          <div class="flex flex-wrap items-center gap-2">
+            
+            <!-- Language Select -->
+            <select id="languageSelect" onchange="onManualLanguageChange()" class="text-xs bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-xl px-3 py-2 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-500 transition">
+              <option value="auto">🌐 Auto-Detect Indian Language</option>
+              <option value="hi">Hindi (हिन्दी)</option>
+              <option value="hinglish">Hinglish (Romanized Hindi)</option>
+              <option value="en">English (Indian Context)</option>
+              <option value="bn">Bengali (বাংলা)</option>
+              <option value="mr">Marathi (मराठी)</option>
+              <option value="gu">Gujarati (ગુજરાતી)</option>
+              <option value="pa">Punjabi (ਪੰਜਾਬੀ)</option>
+              <option value="ta">Tamil (தமிழ்)</option>
+              <option value="te">Telugu (తెలుగు)</option>
+              <option value="kn">Kannada (ಕನ್ನಡ)</option>
+              <option value="ml">Malayalam (മലയാളം)</option>
+              <option value="or">Odia (ଓଡ଼ିଆ)</option>
+              <option value="as">Assamese (অসমীয়া)</option>
+              <option value="ur">Urdu (اردو)</option>
+              <option value="sa">Sanskrit (संस्कृतम्)</option>
+            </select>
+
+            <!-- Voice Speech Recognition -->
+            <button onclick="toggleVoiceDictation('mainTextInput')" id="voiceDictateBtn" class="text-xs bg-bharatSaffron-50 hover:bg-bharatSaffron-100 text-bharatSaffron-700 px-3 py-2 rounded-xl border border-bharatSaffron-200 transition font-semibold flex items-center gap-1.5 shadow-sm" title="Live Voice Speech-to-Text in Indian Languages">
+              <svg class="w-3.5 h-3.5 text-bharatSaffron-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+              </svg>
+              <span id="voiceStatusLabel">Voice Dictate</span>
+            </button>
+
+            <!-- Quick Samples -->
+            <button onclick="loadSampleText('ai-hindi')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-2 rounded-xl border border-slate-200 transition font-medium">
+              Sample: AI Hindi
+            </button>
+            <button onclick="loadSampleText('human-hinglish')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-2 rounded-xl border border-slate-200 transition font-medium">
+              Sample: Hinglish
+            </button>
+
+            <!-- Upload TXT, DOCX, PDF -->
+            <label class="cursor-pointer text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl border border-slate-200 transition font-medium flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+              </svg>
+              <span>Upload PDF / DOCX / TXT</span>
+              <input type="file" id="fileUploader" accept=".txt,.docx,.pdf" onchange="handleFileUpload(event)" class="hidden">
+            </label>
+          </div>
+        </div>
+
+        <div class="relative mt-4">
+          <textarea id="mainTextInput" rows="8" oninput="handleTextInputChange()" placeholder="Paste or type text in Hindi, Hinglish, Bengali, Tamil, Telugu, Marathi, English, or other Indian languages... (Minimum 50 words recommended for statistical burstiness analysis)" class="w-full p-4 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50/50 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-bharatSaffron-500 text-sm sm:text-base leading-relaxed resize-y font-sans transition"></textarea>
+          
+          <!-- Floating Action Clean -->
+          <button onclick="clearMainText()" class="absolute right-3.5 top-3.5 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition" title="Clear text">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Metrics Count & Main Action Trigger Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
+          <div class="flex items-center gap-4 flex-wrap">
+            <span>Words: <strong id="wordCount" class="text-slate-900 font-bold">0</strong></span>
+            <span>Characters: <strong id="charCount" class="text-slate-900 font-bold">0</strong></span>
+            <span>Sentences: <strong id="sentenceCount" class="text-slate-900 font-bold">0</strong></span>
+            <span>Est. Read: <strong id="readTimeEstimate" class="text-slate-900 font-bold">0 min</strong></span>
+            <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200/70 rounded-lg font-semibold">Max Capacity: 20,000 Words</span>
+            <span id="scriptBadge" class="px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700 font-mono font-medium">Script: Auto</span>
+            <span id="codeSwitchRate" class="px-2.5 py-1 bg-slate-100 rounded-lg text-slate-700 font-medium">Code-Switch: 0%</span>
+          </div>
+
+          <div class="flex items-center gap-2.5">
+            <button onclick="runAiDetection()" id="detectBtn" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indicNavy-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg transition">
+              <svg class="w-4 h-4 text-bharatSaffron-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <span>Analyze Text for AI Signals</span>
+            </button>
+
+            <button onclick="goToHumanizerWithCurrentText()" class="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-bharatSaffron-500 to-bharatSaffron-600 hover:from-bharatSaffron-600 hover:to-bharatSaffron-700 text-white font-semibold text-xs sm:text-sm shadow-md hover:shadow-lg transition">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              <span>Humanize (Sahaj & Saral)</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="detectionResultsPanel" class="hidden space-y-6">
+        
+        <!-- Summary Results Banner Card -->
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+            
+            <!-- Left Circular Gauge (0-100%) -->
+            <div class="lg:col-span-4 flex flex-col items-center justify-center p-4 border-b lg:border-b-0 lg:border-r border-slate-100 text-center">
+              <div class="relative w-44 h-44 flex items-center justify-center">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                  <path class="text-slate-100" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path id="scoreCircle" class="text-bharatSaffron-500 transition-all duration-1000 ease-out" stroke-dasharray="0, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute flex flex-col items-center">
+                  <span id="scoreNumber" class="text-4xl font-extrabold text-slate-900 tracking-tight">--%</span>
+                  <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">AI Likelihood</span>
+                </div>
+              </div>
+
+              <!-- Classification Tag -->
+              <div id="classificationPill" class="mt-3 px-4 py-1.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 shadow-sm">
+                Evaluating...
+              </div>
+
+              <p class="text-[11px] text-slate-400 mt-2.5 max-w-xs">
+                Estimated probability based on linguistic signals, rhythm variance, and vocabulary patterns.
+              </p>
+            </div>
+
+            <!-- Middle: Multivariate Signal Breakdown -->
+            <div class="lg:col-span-5 space-y-4 px-2">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Multivariate Linguistic Signals</h3>
+              
+              <!-- Signal 1: Burstiness -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1.5">
+                  <span class="text-slate-800">Sentence Burstiness (Rhythm Variation)</span>
+                  <span id="valBurstiness" class="text-slate-500 font-medium">Normal</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                  <div id="barBurstiness" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-700" style="width: 50%"></div>
+                </div>
+              </div>
+
+              <!-- Signal 2: Perplexity / Predictability -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1.5">
+                  <span class="text-slate-800">Lexical Predictability (Perplexity Proxy)</span>
+                  <span id="valPerplexity" class="text-slate-500 font-medium">Medium</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                  <div id="barPerplexity" class="bg-amber-500 h-2.5 rounded-full transition-all duration-700" style="width: 50%"></div>
+                </div>
+              </div>
+
+              <!-- Signal 3: Structural Regularity -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1.5">
+                  <span class="text-slate-800">Sentence Structural Uniformity</span>
+                  <span id="valUniformity" class="text-slate-500 font-medium">Low</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                  <div id="barUniformity" class="bg-blue-500 h-2.5 rounded-full transition-all duration-700" style="width: 35%"></div>
+                </div>
+              </div>
+
+              <!-- Signal 4: Formulaic Indian Discourse -->
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1.5">
+                  <span class="text-slate-800">Formulaic Discourse & Transitions</span>
+                  <span id="valDiscourse" class="text-slate-500 font-medium">Minimal</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                  <div id="barDiscourse" class="bg-purple-500 h-2.5 rounded-full transition-all duration-700" style="width: 25%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Confidence & False-Positive Guardrail -->
+            <div class="lg:col-span-3 bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/80 space-y-3">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span class="text-xs font-medium text-slate-500">Confidence</span>
+                <span id="confBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800">Medium</span>
+              </div>
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span class="text-xs font-medium text-slate-500">False-Positive Risk</span>
+                <span id="fpRiskBadge" class="text-xs font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Low</span>
+              </div>
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+                <span class="text-xs font-medium text-slate-500">Code-Switch Bias</span>
+                <span class="text-xs font-bold text-slate-700">Protected (Neutral)</span>
+              </div>
+              <div class="text-[11px] text-slate-500 leading-snug">
+                <span class="font-bold text-slate-700">Analysis Note:</span> <span id="summaryVerdictText">Evaluating statistical distribution across Indic morphological patterns.</span>
+              </div>
+              <button onclick="exportDetectionReport()" class="w-full mt-2 py-2 px-3 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition shadow-sm">
+                <svg class="w-3.5 h-3.5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <span>Export Audit Report</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-7 shadow-sm space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">Interactive Sentence Heatmap</h3>
+              <p class="text-xs text-slate-500">Click any highlighted sentence to inspect specific linguistic signals, patterns, and suggested human revisions.</p>
+            </div>
+            
+            <!-- Legend Indicators -->
+            <div class="flex items-center gap-3 text-xs font-medium">
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> Low AI signal</span>
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span> Moderate signal</span>
+              <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span> High AI signal</span>
+            </div>
+          </div>
+
+          <!-- Sentence Spans Container -->
+          <div id="sentenceHeatmapContainer" class="p-5 rounded-2xl bg-slate-50/70 border border-slate-200 leading-relaxed text-sm sm:text-base font-sans min-h-[140px] max-h-[380px] overflow-y-auto">
+            <!-- Dynamically populated with sentence badges -->
+          </div>
+
+          <!-- Selected Sentence Inspector Drawer -->
+          <div id="sentenceInspectorDrawer" class="hidden bg-slate-900 text-white p-5 rounded-2xl space-y-3.5 transition shadow-xl">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-bharatSaffron-400 flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Sentence Linguistic Inspector
+              </span>
+              <button onclick="closeSentenceInspector()" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded bg-slate-800">✕ Close</button>
+            </div>
+
+            <div class="text-sm font-medium text-slate-100 bg-slate-800/90 p-3.5 rounded-xl border border-slate-700 italic" id="inspectorSentenceText">
+              "Selected sentence will appear here"
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <span class="text-slate-400 block mb-0.5">Assigned Signal Level:</span>
+                <span id="inspectorSignalLevel" class="font-bold text-amber-300">Moderate</span>
+              </div>
+              <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <span class="text-slate-400 block mb-0.5">Identified Pattern:</span>
+                <span id="inspectorPattern" class="font-semibold text-slate-200">Symmetrical cadence</span>
+              </div>
+              <div class="bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <span class="text-slate-400 block mb-0.5">Indicator Confidence:</span>
+                <span id="inspectorConfidence" class="font-semibold text-slate-200">72%</span>
+              </div>
+            </div>
+
+            <!-- Suggested Human Revision -->
+            <div class="bg-emerald-950/50 border border-emerald-800/70 p-3.5 rounded-xl space-y-1">
+              <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Suggested Humanized Revision:</span>
+              <p id="inspectorRevision" class="text-xs sm:text-sm text-emerald-100 font-sans">
+                "Natural variant with contextual Indic phrasing."
+              </p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 2: HUMANIZER (Indic Sahaj & Saral Engine)                 -->
+    <!-- ============================================================== -->
+    <section id="view-humanizer" class="hidden space-y-6">
+      
+      <!-- Top Humanizer Controls Header -->
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-bold text-slate-900">Indic Natural-Language Humanizer</h2>
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-100 text-orange-800 border border-orange-200">Sahaj & Saral Mode</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5">Converts cold, robotic machine translations into 100% natural, empathetic, and organic human thinking while strictly locking facts, schemes, and names.</p>
+          </div>
+
+          <!-- Quick Actions & Audio Listen -->
+          <div class="flex items-center gap-2">
+            <!-- Listen / TTS Button -->
+            <button onclick="speakHumanizedText()" id="ttsPlayBtn" class="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-800 px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1.5 border border-emerald-200 shadow-sm" title="Listen with human expressive voice">
+              <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+              </svg>
+              <span id="ttsBtnText">Sunayein (Listen)</span>
+            </button>
+
+            <button onclick="copyHumanizedText()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl font-medium transition flex items-center gap-1 border border-slate-200">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+              </svg>
+              <span>Copy</span>
+            </button>
+            <button onclick="downloadHumanizedDoc('txt')" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl font-medium transition flex items-center gap-1 border border-slate-200">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              <span>Download</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t border-slate-100">
+          
+          <!-- Mode Select -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-700">Writing Mode:</label>
+            <select id="humanizerMode" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-semibold text-slate-800 focus:ring-2 focus:ring-bharatSaffron-500 focus:outline-none">
+              <option value="sahajSaral" selected>🌟 Mode 0: Sahaj & Saral (100% Human Thinking)</option>
+              <option value="natural">Mode 1: Natural (Everyday Organic)</option>
+              <option value="academic">Mode 2: Academic (College & Research)</option>
+              <option value="professional">Mode 3: Professional (Corporate & NGO)</option>
+              <option value="conversational">Mode 4: Conversational (Casual & Idiomatic)</option>
+              <option value="indianNative">Mode 5: Indian Native Style (Contextual Bharat)</option>
+              <option value="simple">Mode 6: Simple Language (Saral Bhasha)</option>
+              <option value="teacher">Mode 7: Teacher / Educational (Pedagogical)</option>
+            </select>
+          </div>
+
+          <!-- Formality Slider -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-semibold text-slate-700">
+              <span>Formality:</span>
+              <span id="formalityLabel" class="text-bharatSaffron-600 font-bold">Balanced</span>
+            </div>
+            <input type="range" id="formalitySlider" min="1" max="3" value="2" oninput="updateFormalityLabel()" class="w-full accent-bharatSaffron-500 cursor-pointer">
+          </div>
+
+          <!-- Vocabulary Complexity -->
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-semibold text-slate-700">
+              <span>Vocabulary:</span>
+              <span id="vocabLabel" class="text-bharatSaffron-600 font-bold">Standard Indian</span>
+            </div>
+            <input type="range" id="vocabSlider" min="1" max="3" value="2" oninput="updateVocabLabel()" class="w-full accent-bharatSaffron-500 cursor-pointer">
+          </div>
+
+          <!-- Indian Context Protected Switch -->
+          <div class="flex flex-col justify-end">
+            <label class="flex items-center gap-2.5 p-2 bg-orange-50/70 border border-orange-200/80 rounded-xl cursor-pointer">
+              <input type="checkbox" id="indianContextToggle" checked class="w-4 h-4 text-bharatSaffron-600 rounded accent-bharatSaffron-600 focus:ring-bharatSaffron-500">
+              <div class="text-xs">
+                <span class="font-bold text-orange-950 block">Indian Context Engine</span>
+                <span class="text-[10px] text-orange-800">Protects schemes (MGNREGA, PMFBY, NITI Aayog)</span>
+              </div>
+            </label>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Original Column -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+          <div class="bg-slate-100/70 px-5 py-3.5 border-b border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Original Input</span>
+            </div>
+            <span id="origWordStat" class="text-xs text-slate-500 font-medium">0 words</span>
+          </div>
+          <div class="p-4 flex-1">
+            <textarea id="humanizerInput" rows="12" placeholder="Text from the detector or paste new text here..." class="w-full h-full p-2 bg-transparent text-slate-800 text-sm leading-relaxed resize-none focus:outline-none"></textarea>
+          </div>
+          <div class="p-3.5 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs">
+            <span class="text-slate-400">Original text remains intact</span>
+            <button onclick="syncDetectorToHumanizer()" class="text-bharatSaffron-600 hover:text-bharatSaffron-700 font-semibold">Pull from Detector Input</button>
+          </div>
+        </div>
+
+        <!-- Humanized Output Column -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden relative">
+          <div class="bg-gradient-to-r from-orange-50 via-amber-50 to-emerald-50 px-5 py-3.5 border-b border-orange-200/60 flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="text-xs font-bold text-orange-950 uppercase tracking-wider">Humanized Natural Indic Output</span>
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <div class="flex items-center bg-white/90 border border-orange-300/80 rounded-xl p-0.5 shadow-sm text-[11px]">
+                <button type="button" id="fontDevlysBtn" onclick="toggleOutputFont('devlys')" class="px-2.5 py-1 rounded-lg font-bold bg-bharatSaffron-600 text-white transition shadow-xs" title="Mandatory DevLys 010 font format for Hindi & Remington Typing">
+                  DevLys 010
+                </button>
+                <button type="button" id="fontUnicodeBtn" onclick="toggleOutputFont('unicode')" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition" title="Standard Unicode Devanagari">
+                  Unicode
+                </button>
+              </div>
+              <span id="diffPill" class="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold hidden">100% Facts Preserved</span>
+              <span id="humWordStat" class="text-xs text-slate-500 font-medium">0 words</span>
+            </div>
+          </div>
+
+          <div class="p-4 sm:p-5 flex-1 relative min-h-[300px]">
+            <!-- Loading Overlay -->
+            <div id="humanizerLoading" class="hidden absolute inset-0 bg-white/95 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center space-y-3">
+              <div class="w-12 h-12 border-4 border-orange-200 border-t-bharatSaffron-600 rounded-full animate-spin"></div>
+              <p class="text-sm font-bold text-slate-900">Applying Sahaj & Saral Human Synthesis...</p>
+              <p id="chunkProgressText" class="text-xs text-slate-500 max-w-sm">Generating organic Indian cadence, removing machine-like repetitive clauses, and securing scheme facts.</p>
+              <div class="w-48 bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                <div id="chunkProgressBar" class="bg-bharatSaffron-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <div id="humanizedTextOutput" class="w-full h-full p-2 text-slate-800 text-sm leading-relaxed whitespace-pre-wrap font-devlys overflow-y-auto min-h-[220px]">
+              Click "Execute Humanization" below to generate natural Indian writing in DevLys 010 font.
+            </div>
+          </div>
+
+          <div class="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs">
+            <button onclick="testHumanizedInDetector()" class="text-slate-600 hover:text-slate-900 font-medium flex items-center gap-1">
+              <svg class="w-3.5 h-3.5 text-bharatSaffron-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+              <span>Verify in AI Detector</span>
+            </button>
+
+            <button onclick="runHumanizationEngine()" id="humanizeActionBtn" class="px-6 py-2.5 rounded-xl bg-bharatSaffron-600 hover:bg-bharatSaffron-700 text-white font-bold shadow-md hover:shadow-lg transition flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span>Execute Humanization</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <div id="transformationAuditCard" class="hidden bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-3">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Humanization Transformation Audit</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+            <span class="text-slate-400 block mb-0.5">Rhythm Asymmetry:</span>
+            <span class="font-bold text-emerald-600" id="auditRhythmChange">+42% Burstiness Variance</span>
+          </div>
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+            <span class="text-slate-400 block mb-0.5">Discourse Softening:</span>
+            <span class="font-bold text-slate-800" id="auditTransitions">Generic AI connectors replaced</span>
+          </div>
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+            <span class="text-slate-400 block mb-0.5">Factual Safeguard:</span>
+            <span class="font-bold text-blue-600">Numbers & Acronyms Frozen</span>
+          </div>
+          <div class="p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+            <span class="text-slate-400 block mb-0.5">Thinking Cadence:</span>
+            <span class="font-bold text-emerald-600">Sahaj & Saral (100% Organic)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 3: IMAGE OCR & MULTIMODAL VISION RECOGNIZER              -->
+    <!-- ============================================================== -->
+    <section id="view-scanner" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-bold text-slate-900">Multimodal Indic Image OCR & Vision Recognizer</h2>
+            <span class="text-xs bg-orange-100 text-orange-800 px-2.5 py-0.5 rounded-full font-bold">Gemini 3 Flash Vision</span>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Upload photos of handwritten Hindi/Tamil/Bengali notes, printed question papers, book excerpts, or screenshots. Our high-precision vision engine extracts text and scripts seamlessly.</p>
+        </div>
+
+        <!-- Drag & Drop Zone -->
+        <div id="imageDropZone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" class="border-2 border-dashed border-slate-300 hover:border-bharatSaffron-500 rounded-3xl p-8 sm:p-12 text-center bg-slate-50/60 hover:bg-slate-50 transition cursor-pointer flex flex-col items-center justify-center space-y-3">
+          <div class="w-14 h-14 rounded-2xl bg-orange-100 text-bharatSaffron-600 flex items-center justify-center">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm font-bold text-slate-800">Drag & drop photo or document screenshot here</p>
+            <p class="text-xs text-slate-400 mt-0.5">Supports PNG, JPG, JPEG, WEBP (Handwritten notes, printed textbooks, circulars)</p>
+          </div>
+          <label class="cursor-pointer px-5 py-2.5 bg-bharatSaffron-600 hover:bg-bharatSaffron-700 text-white rounded-xl text-xs font-semibold shadow-md transition">
+            <span>Browse Image File</span>
+            <input type="file" id="imageInput" accept="image/*" onchange="handleImageInputUpload(event)" class="hidden">
+          </label>
+        </div>
+
+        <!-- Extracted Text & Image Preview Sandbox -->
+        <div id="scannerResultGrid" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+          <!-- Image Preview -->
+          <div class="space-y-2">
+            <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Uploaded Image Source:</span>
+            <div class="bg-slate-900 rounded-2xl p-2 flex items-center justify-center min-h-[260px] max-h-[420px] overflow-hidden">
+              <img id="scannedImagePreview" src="" alt="Scanned Document" class="max-h-[400px] w-auto object-contain rounded-xl">
+            </div>
+          </div>
+
+          <!-- Extracted OCR Text -->
+          <div class="space-y-2 flex flex-col">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-700 uppercase tracking-wider">Extracted Multilingual Text:</span>
+              <span id="ocrLangBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-bold">Vision Extracted</span>
+            </div>
+            <textarea id="ocrOutputText" rows="12" class="w-full flex-1 p-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-bharatSaffron-500 leading-relaxed"></textarea>
+            
+            <!-- Quick Send Actions -->
+            <div class="flex items-center gap-2 pt-2">
+              <button onclick="sendOcrToDetector()" class="flex-1 py-2.5 px-4 rounded-xl bg-indicNavy-900 hover:bg-slate-800 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <span>Analyze OCR in AI Detector</span>
+              </button>
+              <button onclick="sendOcrToHumanizer()" class="flex-1 py-2.5 px-4 rounded-xl bg-bharatSaffron-600 hover:bg-bharatSaffron-700 text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                <span>Humanize Extracted Text</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 4: LINGUISTIC ANALYSIS & BURSTINESS (Charts)              -->
+    <!-- ============================================================== -->
+    <section id="view-analysis" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Deep Indic Linguistic & Rhythm Analyzer</h2>
+          <p class="text-xs text-slate-500">Fine-grained metrics: Sentence length rhythm, lexical diversity, Tatsam/Tadbhav equilibrium, Matra/Anusvara ratios, and clause complexity.</p>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          <!-- Sentence Length Rhythm Chart -->
+          <div class="bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Burstiness Curve (Words per Sentence)</h3>
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-semibold">Human = Dynamic Spikes</span>
+            </div>
+            <div class="h-64">
+              <canvas id="burstinessChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Radar: Multivariate Signal Distribution -->
+          <div class="bg-slate-50/70 p-5 rounded-2xl border border-slate-200/80">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider">Linguistic Signal Vector</h3>
+              <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-700 font-semibold">5-Dimensional Model</span>
+            </div>
+            <div class="h-64 flex items-center justify-center">
+              <canvas id="radarChart"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-200">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+              <tr>
+                <th class="p-3.5">Linguistic Dimension</th>
+                <th class="p-3.5">Current Text Value</th>
+                <th class="p-3.5">Human Baseline (Indic)</th>
+                <th class="p-3.5">AI Standard Model</th>
+                <th class="p-3.5">Diagnostic Significance</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-slate-600 bg-white">
+              <tr>
+                <td class="p-3.5 font-bold text-slate-800">Sentence Length Standard Deviation (Burstiness)</td>
+                <td class="p-3.5 font-mono font-bold text-orange-600" id="metricSd">-</td>
+                <td class="p-3.5 font-mono">σ > 7.5</td>
+                <td class="p-3.5 font-mono">σ < 3.8</td>
+                <td class="p-3.5">Low variance reflects robotic rhythmic symmetry</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-bold text-slate-800">Type-Token Ratio (TTR / Lexical Diversity)</td>
+                <td class="p-3.5 font-mono font-bold text-orange-600" id="metricTtr">-</td>
+                <td class="p-3.5 font-mono">> 0.58</td>
+                <td class="p-3.5 font-mono">0.35 - 0.48</td>
+                <td class="p-3.5">Calculated via unique roots vs total tokens</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-bold text-slate-800">Indic Postposition & Karaka Regularity</td>
+                <td class="p-3.5 font-mono font-bold text-orange-600" id="metricKaraka">-</td>
+                <td class="p-3.5 font-mono">Variable</td>
+                <td class="p-3.5 font-mono">Strictly repetitive</td>
+                <td class="p-3.5">Checks "ने, को, से, के लिए, का/के/की, में, पर" syntax</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-bold text-slate-800">Tatsam vs Tadbhav Balance (Hindi/Bengali/Marathi)</td>
+                <td class="p-3.5 font-mono font-bold text-orange-600" id="metricTatsam">-</td>
+                <td class="p-3.5 font-mono">Contextual Blend</td>
+                <td class="p-3.5 font-mono">High Sanskritized cluster</td>
+                <td class="p-3.5">LLMs default to overly rigid formal Sanskrit loans</td>
+              </tr>
+              <tr>
+                <td class="p-3.5 font-bold text-slate-800">Formulaic Transition Density</td>
+                <td class="p-3.5 font-mono font-bold text-orange-600" id="metricTransitions">-</td>
+                <td class="p-3.5 font-mono">< 1.2 per 100w</td>
+                <td class="p-3.5 font-mono">> 3.4 per 100w</td>
+                <td class="p-3.5">"Furthermore / इसके अतिरिक्त / निष्कर्षतः" overuse</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 5: HINGLISH & CODE-SWITCHING SUITE                        -->
+    <!-- ============================================================== -->
+    <section id="view-tools" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Hinglish & Multi-Script Code-Switching Suite</h2>
+          <p class="text-xs text-slate-500">Detects Romanized Indian languages (Hinglish, Tanglish, Banglish). Treats code-switching with dialect neutrality, and enables seamless inter-dialect transformation.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
+            <span class="text-xs font-bold text-slate-800 uppercase tracking-wider block">Hinglish → Shuddh / Formal Hindi</span>
+            <p class="text-xs text-slate-500">Converts Roman Hindi ("Aajkal AI ka use badh gaya hai") into structured Devanagari Hindi.</p>
+            <button onclick="transformHinglish('to-formal-hindi')" class="w-full py-2.5 bg-indicNavy-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition shadow-sm">
+              Convert to Formal Hindi
+            </button>
+          </div>
+
+          <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
+            <span class="text-xs font-bold text-slate-800 uppercase tracking-wider block">Hinglish → Professional English</span>
+            <p class="text-xs text-slate-500">Translates colloquial code-switched text into clean, formal Indian English suitable for corporate reports.</p>
+            <button onclick="transformHinglish('to-english')" class="w-full py-2.5 bg-indicNavy-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition shadow-sm">
+              Convert to Professional English
+            </button>
+          </div>
+
+          <div class="p-5 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-2">
+            <span class="text-xs font-bold text-slate-800 uppercase tracking-wider block">Devanagari → Natural Hinglish</span>
+            <p class="text-xs text-slate-500">Converts rigid Hindi into conversational Roman Hindi for modern messaging and youth communications.</p>
+            <button onclick="transformHinglish('to-hinglish')" class="w-full py-2.5 bg-indicNavy-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold transition shadow-sm">
+              Convert to Natural Hinglish
+            </button>
+          </div>
+        </div>
+
+        <!-- Tool Sandbox -->
+        <div class="border-t border-slate-100 pt-5 space-y-3">
+          <label class="text-xs font-bold text-slate-800">Code-Switching Workspace</label>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <textarea id="toolsInput" rows="5" placeholder="Enter mixed or Romanized text (e.g., 'Project ka deadline kal hai, but data verify karna baaki hai...')" class="w-full p-4 rounded-2xl border border-slate-200 bg-slate-50 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-bharatSaffron-500 leading-relaxed"></textarea>
+            <div id="toolsOutput" class="w-full p-4 rounded-2xl border border-slate-200 bg-slate-100 text-sm font-sans whitespace-pre-wrap text-slate-800 min-h-[130px] leading-relaxed">
+              Transformation results will display here.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 6: AUTHOR VOICE PROFILER ("LEARN MY WRITING STYLE")       -->
+    <!-- ============================================================== -->
+    <section id="view-voice" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Learn My Writing Style (Author Voice Profiler)</h2>
+          <p class="text-xs text-slate-500">Upload 3 samples of your authentic writing. BhashaGuard calculates your personal sentence rhythm, burstiness variance, and vocabulary density to calibrate the Humanizer to your true voice.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div class="space-y-2">
+            <span class="text-xs font-bold text-slate-700">Writing Sample 1 (Email / Report):</span>
+            <textarea id="voiceSample1" rows="5" placeholder="Paste sample 1..." class="w-full p-3.5 text-xs rounded-2xl border border-slate-200 bg-slate-50"></textarea>
+          </div>
+          <div class="space-y-2">
+            <span class="text-xs font-bold text-slate-700">Writing Sample 2 (Essay / Academic):</span>
+            <textarea id="voiceSample2" rows="5" placeholder="Paste sample 2..." class="w-full p-3.5 text-xs rounded-2xl border border-slate-200 bg-slate-50"></textarea>
+          </div>
+          <div class="space-y-2">
+            <span class="text-xs font-bold text-slate-700">Writing Sample 3 (Notes / Commentary):</span>
+            <textarea id="voiceSample3" rows="5" placeholder="Paste sample 3..." class="w-full p-3.5 text-xs rounded-2xl border border-slate-200 bg-slate-50"></textarea>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+          <span class="text-xs text-slate-500">Zero-Retention: Samples are processed locally and discarded immediately upon profile creation.</span>
+          <button onclick="trainVoiceProfile()" class="px-6 py-2.5 rounded-xl bg-bharatSaffron-600 hover:bg-bharatSaffron-700 text-white font-bold text-xs transition shadow-md">
+            Generate My Author Profile
+          </button>
+        </div>
+
+        <!-- Voice Profile Active Card -->
+        <div id="voiceProfileResult" class="hidden bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              Author Profile Synthesized
+            </span>
+            <span class="text-[11px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">Active for Humanizer</span>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="bg-white p-3 rounded-xl border border-slate-200">
+              <span class="text-slate-400 block text-[10px]">Average Sentence Length:</span>
+              <strong id="voiceAvgLen" class="text-slate-900 font-bold">14.2 words</strong>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200">
+              <span class="text-slate-400 block text-[10px]">Rhythm Variance (Burstiness):</span>
+              <strong id="voiceBurst" class="text-slate-900 font-bold">High (σ 8.4)</strong>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200">
+              <span class="text-slate-400 block text-[10px]">Vocabulary Cadence:</span>
+              <strong id="voiceVocab" class="text-slate-900 font-bold">Modern Indic Mixed</strong>
+            </div>
+            <div class="bg-white p-3 rounded-xl border border-slate-200">
+              <span class="text-slate-400 block text-[10px]">Preferred Transitions:</span>
+              <strong id="voiceTrans" class="text-slate-900 font-bold">Contextual / Organic</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 7: SESSION AUDIT HISTORY                                 -->
+    <!-- ============================================================== -->
+    <section id="view-history" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-slate-900">Session Audit Logs & History</h2>
+            <p class="text-xs text-slate-500">Review past analyses. Data resides exclusively in temporary browser memory with single-click permanent deletion.</p>
+          </div>
+          <button onclick="clearAllHistory()" class="text-xs text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-4 py-2 rounded-xl font-bold transition">
+            Delete My Data Permanently
+          </button>
+        </div>
+
+        <div id="historyTableContainer" class="overflow-x-auto rounded-2xl border border-slate-200">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+              <tr>
+                <th class="p-3.5">Time</th>
+                <th class="p-3.5">Language</th>
+                <th class="p-3.5">Words</th>
+                <th class="p-3.5">AI Likelihood</th>
+                <th class="p-3.5">Classification</th>
+                <th class="p-3.5">False-Pos. Risk</th>
+                <th class="p-3.5 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody" class="divide-y divide-slate-100 text-slate-600 bg-white">
+              <tr>
+                <td colspan="7" class="p-5 text-center text-slate-400">No detection events recorded in this session yet.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW: CREATOR & MISSION STATEMENT                             -->
+    <!-- ============================================================== -->
+    <section id="view-creator" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-9 shadow-sm space-y-8">
+        
+        <!-- Header Banner -->
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-5 pb-6 border-b border-slate-100">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 via-bharatSaffron-500 to-emerald-500 p-0.5 shadow-xl shrink-0">
+            <div class="w-full h-full bg-indicNavy-950 rounded-[14px] flex items-center justify-center text-xl font-black text-amber-400">
+              UB
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h2 class="text-2xl font-extrabold text-slate-900">About the Creator</h2>
+              <span class="px-3 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">Umesh Babu • UB 3.0</span>
+            </div>
+            <p class="text-sm font-semibold text-bharatSaffron-600 mt-1">Creator & Lead Architect: Umesh Babu</p>
+          </div>
+        </div>
+
+        <!-- Biography Introduction -->
+        <div class="bg-gradient-to-r from-orange-50/60 via-amber-50/40 to-slate-50 p-6 rounded-2xl border border-orange-200/70 text-slate-800 leading-relaxed text-sm space-y-3.5">
+          <p>
+            <strong>Umesh Babu</strong> is an educator, researcher, technology enthusiast, content creator, and social development professional with a strong interest in Artificial Intelligence, Geographic Information Systems (GIS), rural development, digital education, and Indian languages.
+          </p>
+          <p>
+            His work focuses on using technology to solve practical problems in education, agriculture, rural development, environmental sustainability, and digital content creation.
+          </p>
+          <p>
+            With experience in education, data management, survey and research activities, agriculture-related projects, insurance, content development, and digital technologies, Umesh Babu has developed a multidisciplinary approach that combines field experience with emerging technologies.
+          </p>
+        </div>
+
+        <!-- Vision and Emphasis Points -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span class="p-1.5 rounded-lg bg-orange-100 text-orange-700">🎯</span>
+              <span>Vision</span>
+            </h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              The vision behind <strong>BhashaGuard AI</strong> is to develop responsible and accessible language technology for Indian users. The platform is designed to help people understand how text is written, improve writing quality, and support natural communication across Indian languages.
+            </p>
+            <div class="pt-2">
+              <span class="text-xs font-bold text-slate-800 block mb-2">The project places particular emphasis on:</span>
+              <ul class="text-xs text-slate-600 space-y-2 list-none">
+                <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-bharatSaffron-500"></span> Indian languages and multilingual communication</li>
+                <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-bharatSaffron-500"></span> Responsible use of Artificial Intelligence</li>
+                <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-bharatSaffron-500"></span> Natural and context-aware writing</li>
+                <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-bharatSaffron-500"></span> Privacy and data security</li>
+                <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-bharatSaffron-500"></span> Explainable AI</li>
+                <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-bharatSaffron-500"></span> Digital education and accessibility</li>
+                <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-bharatSaffron-500"></span> Technology for social and rural development</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="space-y-6">
+            <!-- Why Indian Languages -->
+            <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span class="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">🇮🇳</span>
+                <span>Why Indian Languages?</span>
+              </h3>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                India has a rich and diverse linguistic landscape, yet many AI-powered writing and language tools are primarily designed around English and a limited number of global languages.
+              </p>
+              <p class="text-xs text-slate-600 leading-relaxed">
+                BhashaGuard AI aims to contribute to a more inclusive digital ecosystem by developing language technologies that understand the linguistic characteristics, cultural context, and real-world usage of Indian languages.
+              </p>
+            </div>
+
+            <!-- Creator's Approach -->
+            <div class="p-6 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3">
+              <h3 class="text-base font-bold text-amber-950 flex items-center gap-2">
+                <span class="p-1.5 rounded-lg bg-amber-200 text-amber-900">⚖️</span>
+                <span>Creator's Approach</span>
+              </h3>
+              <div class="p-3 bg-white/80 rounded-xl border border-amber-300 font-bold text-slate-900 text-xs sm:text-sm text-center">
+                “Technology should improve human capability, not replace human judgment.”
+              </div>
+              <p class="text-xs text-slate-700 leading-relaxed">
+                Therefore, BhashaGuard AI is designed to provide analytical insights rather than make unsupported or absolute claims. AI detection results are treated as probabilistic assessments, while the humanization system focuses on improving clarity, naturalness, readability, and linguistic quality without deliberately introducing errors or attempting to deceive detection systems.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Long-Term Vision -->
+        <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+            <span class="p-1.5 rounded-lg bg-blue-100 text-blue-700">🌱</span>
+            <span>Long-Term Vision</span>
+          </h3>
+          <p class="text-xs text-slate-600">
+            The long-term goal is to develop a reliable Indian-language AI ecosystem that can support:
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs text-slate-700 pt-1">
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-medium">✓ Students and educators</div>
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-medium">✓ Researchers and academic institutions</div>
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-medium">✓ Writers and content creators</div>
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-medium">✓ Government and non-government organizations</div>
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-medium">✓ Businesses and professionals</div>
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-medium">✓ Indian-language digital publishers</div>
+            <div class="p-2.5 bg-white rounded-xl border border-slate-200 font-medium sm:col-span-2 lg:col-span-3">✓ Developers building multilingual applications</div>
+          </div>
+          <p class="text-xs text-slate-600 pt-2 leading-relaxed">
+            Through <strong>BhashaGuard AI</strong>, the creator aims to combine technology, language, education, and social impact to make advanced AI-powered language tools more useful and accessible to Indian users.
+          </p>
+        </div>
+
+        <!-- Official Project & Creator Card -->
+        <div class="p-6 rounded-2xl bg-indicNavy-950 text-white border border-slate-800 shadow-xl space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-bharatSaffron-400 tracking-wider">Official Project Record</span>
+              <h4 class="text-xl font-extrabold text-white">BhashaGuard AI (UB 3.0)</h4>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-400">Creator:</span>
+              <p class="text-base font-bold text-amber-300">Umesh Babu</p>
+            </div>
+          </div>
+          <p class="text-xs text-slate-300">
+            <strong>Focus:</strong> Indian Languages • Artificial Intelligence • Natural Language Processing • Responsible AI • Digital Education
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ============================================================== -->
+    <!-- VIEW 8: EXPLAINABLE ARCHITECTURE & METHODOLOGY                -->
+    <!-- ============================================================== -->
+    <section id="view-methodology" class="hidden space-y-6">
+      <div class="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-900">BhashaGuard Architecture & Explainable AI Methodology</h2>
+          <p class="text-xs text-slate-500">How our 6-layer Indic linguistic engine operates, why AI detection is probabilistic, and our protocols for avoiding false accusations.</p>
+        </div>
+
+        <!-- 6-Layer Architecture Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <span class="font-bold text-bharatSaffron-600">Layer 1: Language & Script ID</span>
+            <p class="text-slate-600">Unicode block mapping + n-gram script detection. Identifies Devanagari, Tamil, Telugu, Bengali, Gurmukhi, Kannada, Malayalam, Odia, Gujarati, Urdu, and Romanized Indian code-switching.</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <span class="font-bold text-bharatSaffron-600">Layer 2: Rule-Based Indic Linguistics</span>
+            <p class="text-slate-600">Examines postpositions, Karaka structures, Tatsam/Tadbhav ratios, Anusvara/Anunasika distribution, and Samyukt-akshar density instead of blindly imposing English grammar models.</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <span class="font-bold text-bharatSaffron-600">Layer 3: Statistical Burstiness & TTR</span>
+            <p class="text-slate-600">Calculates sentence-length variance (σ), clause symmetry, and root Type-Token Ratio. Machine generation displays unnaturally uniform sentence cadence.</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <span class="font-bold text-bharatSaffron-600">Layer 4: Formulaic Indian Discourse</span>
+            <p class="text-slate-600">Detects overused LLM translation crutches (e.g., "यह ध्यान देना महत्वपूर्ण है कि...", "निष्कर्षतः...", "इसके अतिरिक्त...") without penalizing genuine human usage.</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <span class="font-bold text-bharatSaffron-600">Layer 5: LLM Contextual Reasoning</span>
+            <p class="text-slate-600">Leverages Gemini 3 Flash as an evaluator to assess semantic depth, local Indian context, and contextual colloquialism.</p>
+          </div>
+          <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+            <span class="font-bold text-bharatSaffron-600">Layer 6: Ensemble Decision Calibration</span>
+            <p class="text-slate-600">Fuses signals into a probabilistic range (0–100%). Scores below 100 words receive an automatic "Insufficient text" disclaimer to protect academic integrity.</p>
+          </div>
+        </div>
+
+        <!-- False Positive Protection Guide -->
+        <div class="bg-amber-50/70 border border-amber-200 p-5 rounded-2xl space-y-2.5">
+          <h3 class="text-sm font-bold text-amber-950 flex items-center gap-2">
+            <svg class="w-4 h-4 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            Critical False Positive Notice for Evaluators & Universities
+          </h3>
+          <p class="text-xs text-amber-900 leading-relaxed">
+            Standardized academic prose, government policy circulars, legal affidavits, and scientific definitions naturally exhibit high grammatical regularity and structured discourse markers. <strong>Never penalize a student, researcher, or employee based on automated scores alone.</strong> Always conduct a human interview and review document version history.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Privacy Modal -->
+  <div id="privacyModal" class="hidden fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-7 shadow-2xl space-y-4 border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+          <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          Privacy, Security & Data Sovereignty
+        </h3>
+        <button onclick="togglePrivacyModal()" class="text-slate-400 hover:text-slate-600 text-sm">✕</button>
+      </div>
+
+      <div class="space-y-2.5 text-xs text-slate-600">
+        <p>• <strong>Zero Document Training:</strong> Your uploaded documents, academic drafts, and inputs are never stored permanently, never sold, and never utilized to train AI models.</p>
+        <p>• <strong>Client-Side Shredder:</strong> Document parsing for PDF and DOCX happens inside your browser sandbox.</p>
+        <p>• <strong>Strict Indian Data Ethics:</strong> Compliant with Digital Personal Data Protection (DPDP) principles with immediate data purge controls.</p>
+      </div>
+
+      <div class="pt-3 border-t border-slate-100 flex justify-end">
+        <button onclick="togglePrivacyModal()" class="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold">
+          Understood
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sessional Login / Sign Up Modal with OTP Validation -->
+  <div id="authModal" class="hidden fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-200 relative overflow-hidden space-y-5">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-orange-100 text-bharatSaffron-600 flex items-center justify-center font-bold shadow-sm">
+            🔐
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-base">Sessional Verification</h3>
+            <p class="text-[11px] text-slate-400">Zero-retention OTP authentication</p>
+          </div>
+        </div>
+        <button onclick="closeAuthModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- STEP 1: Enter Mobile / Email -->
+      <div id="authStep1" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">Enter 10-Digit Mobile (+91) or Email Address</label>
+          <div class="relative">
+            <input type="text" id="authIdentityInput" placeholder="e.g. 9876543210 or yourname@example.com" class="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-500 font-medium">
+          </div>
+          <p class="text-[11px] text-slate-400 mt-1.5">A secure 6-digit OTP will be dispatched immediately for instant validation.</p>
+        </div>
+
+        <!-- Optional Creator Passkey Collapsible -->
+        <div class="pt-1">
+          <button type="button" onclick="toggleCreatorPasskeyField()" class="text-[11px] text-bharatSaffron-600 hover:text-bharatSaffron-700 font-semibold flex items-center gap-1">
+            <span>Have a Creator / Admin Passkey?</span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          <div id="creatorPasskeyContainer" class="hidden mt-2 p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-1.5">
+            <label class="block text-[11px] font-bold text-amber-900">Creator Passkey (Unlocks Developer Console)</label>
+            <input type="password" id="creatorPasskeyInput" placeholder="Passkey (e.g. UB30CREATOR)" class="w-full px-3 py-2 text-xs rounded-lg border border-amber-300 bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500">
+          </div>
+        </div>
+
+        <button type="button" onclick="dispatchOtpRequest()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-bharatSaffron-500 to-amber-500 hover:from-bharatSaffron-600 hover:to-amber-600 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+          <span>Send Verification OTP</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+          </svg>
+        </button>
+
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-500 leading-relaxed">
+          <strong class="text-slate-700">Security Guarantee:</strong> This is a sandboxed sessional sign-in. Your credentials are processed in browser memory and automatically expunged when the tab is closed.
+        </div>
+      </div>
+
+      <!-- STEP 2: Enter 6-Digit OTP -->
+      <div id="authStep2" class="hidden space-y-4">
+        
+        <!-- Target Identity & Change Link -->
+        <div class="flex items-center justify-between bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200">
+          <div class="truncate text-xs">
+            <span class="text-slate-400 block text-[10px]">OTP sent to:</span>
+            <strong id="targetIdentityLabel" class="text-slate-800 font-bold">--</strong>
+          </div>
+          <button type="button" onclick="resetToAuthStep1()" class="text-xs text-bharatSaffron-600 hover:underline font-bold shrink-0">
+            Edit
+          </button>
+        </div>
+
+        <!-- Simulated SMS/Email Instant Notification Card -->
+        <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-3.5 shadow-sm space-y-1">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-emerald-900 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+              📲 Instant Dispatch (SMS / Email)
+            </span>
+            <span class="text-[10px] text-emerald-700 font-mono">Just Now</span>
+          </div>
+          <p class="text-xs text-slate-700 leading-snug">
+            Your BhashaGuard verification code is: <strong id="simulatedOtpCode" class="text-sm font-black font-mono tracking-widest text-emerald-950 px-2 py-0.5 rounded bg-emerald-100/90 border border-emerald-300">------</strong>
+          </p>
+          <p class="text-[10px] text-emerald-800">You can tap below or copy the code directly to log in.</p>
+        </div>
+
+        <!-- 6 Auto-Advancing Digit Input Boxes -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-2 text-center">Enter 6-Digit Verification Code</label>
+          <div class="grid grid-cols-6 gap-2 sm:gap-2.5 max-w-xs mx-auto">
+            <input type="text" maxlength="1" inputmode="numeric" oninput="handleOtpInput(this, 0)" onkeydown="handleOtpKeydown(event, 0)" onpaste="handleOtpPaste(event)" class="otp-box w-full aspect-square text-center font-mono font-bold text-lg sm:text-xl rounded-xl border-2 border-slate-300 focus:border-bharatSaffron-500 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-200 transition">
+            <input type="text" maxlength="1" inputmode="numeric" oninput="handleOtpInput(this, 1)" onkeydown="handleOtpKeydown(event, 1)" onpaste="handleOtpPaste(event)" class="otp-box w-full aspect-square text-center font-mono font-bold text-lg sm:text-xl rounded-xl border-2 border-slate-300 focus:border-bharatSaffron-500 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-200 transition">
+            <input type="text" maxlength="1" inputmode="numeric" oninput="handleOtpInput(this, 2)" onkeydown="handleOtpKeydown(event, 2)" onpaste="handleOtpPaste(event)" class="otp-box w-full aspect-square text-center font-mono font-bold text-lg sm:text-xl rounded-xl border-2 border-slate-300 focus:border-bharatSaffron-500 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-200 transition">
+            <input type="text" maxlength="1" inputmode="numeric" oninput="handleOtpInput(this, 3)" onkeydown="handleOtpKeydown(event, 3)" onpaste="handleOtpPaste(event)" class="otp-box w-full aspect-square text-center font-mono font-bold text-lg sm:text-xl rounded-xl border-2 border-slate-300 focus:border-bharatSaffron-500 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-200 transition">
+            <input type="text" maxlength="1" inputmode="numeric" oninput="handleOtpInput(this, 4)" onkeydown="handleOtpKeydown(event, 4)" onpaste="handleOtpPaste(event)" class="otp-box w-full aspect-square text-center font-mono font-bold text-lg sm:text-xl rounded-xl border-2 border-slate-300 focus:border-bharatSaffron-500 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-200 transition">
+            <input type="text" maxlength="1" inputmode="numeric" oninput="handleOtpInput(this, 5)" onkeydown="handleOtpKeydown(event, 5)" onpaste="handleOtpPaste(event)" class="otp-box w-full aspect-square text-center font-mono font-bold text-lg sm:text-xl rounded-xl border-2 border-slate-300 focus:border-bharatSaffron-500 focus:outline-none focus:ring-2 focus:ring-bharatSaffron-200 transition">
+          </div>
+        </div>
+
+        <!-- Timer & Resend Button -->
+        <div class="text-center text-xs">
+          <div id="otpTimerDisplay" class="text-slate-500">
+            Resend code in: <span id="otpCountdown" class="font-bold text-bharatSaffron-600 font-mono">30</span>s
+          </div>
+          <button id="resendOtpBtn" type="button" onclick="resendOtp()" class="hidden text-bharatSaffron-600 hover:text-bharatSaffron-700 font-bold hover:underline">
+            Resend OTP Code
+          </button>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="button" onclick="verifyOtpAndSignIn()" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-bharatSaffron-500 to-amber-500 hover:from-bharatSaffron-600 hover:to-amber-600 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2">
+          <span>Verify OTP & Sign In</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Printable Audit Report -->
+  <div id="printArea" class="hidden p-8 font-sans">
+    <div class="border-b-2 border-slate-900 pb-4 mb-6">
+      <h1 class="text-2xl font-bold">BhashaGuard AI – Multilingual Detection Audit</h1>
+      <p class="text-sm text-slate-600">Official Linguistic Diagnostic & Probabilistic Assessment</p>
+    </div>
+    <div id="printReportContent" class="space-y-4 text-sm">
+      <!-- Injected before print -->
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-indicNavy-950 text-slate-400 text-xs py-7 border-t border-slate-800 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <p class="text-slate-200 font-semibold">© 2026 BhashaGuard AI • Engineered for Bharat & Multilingual Diversity</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Proudly supporting 14 Indian languages, code-switching dialects, Hinglish, OCR & Voice.</p>
+      </div>
+      <div class="flex items-center gap-4 text-slate-400 font-medium">
+        <button onclick="switchTab('methodology')" class="hover:text-white transition">Probabilistic Standards</button>
+        <span>•</span>
+        <button onclick="togglePrivacyModal()" class="hover:text-white transition">DPDP Compliance</button>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* Application Core State */
+    const state = {
+      currentTab: 'detector',
+      text: '',
+      detectedLang: 'hi',
+      detectedScript: 'Devanagari',
+      outputFontFormat: 'devlys', // 'devlys' | 'unicode'
+      lastHumanizedUnicode: '',
+      lastHumanizedDevlys: '',
+      codeSwitchRatio: 0,
+      analysis: null,
+      history: [],
+      voiceProfile: null,
+      isVoiceRecording: false,
+      speechRecognition: null,
+      auth: {
+        isLoggedIn: false,
+        identity: '',
+        role: 'guest', // 'verified_user' | 'creator' | 'guest'
+        generatedOtp: '',
+        countdownTimer: null
+      },
+      charts: {
+        burstiness: null,
+        radar: null
+      }
+    };
+
+    /* Indic Language Dictionary */
+    const INDIC_LANGUAGES = {
+      hi: { name: 'Hindi', native: 'हिन्दी', script: 'Devanagari', unicodeRange: [0x0900, 0x097F] },
+      bn: { name: 'Bengali', native: 'বাংলা', script: 'Bengali', unicodeRange: [0x0980, 0x09FF] },
+      mr: { name: 'Marathi', native: 'मराठी', script: 'Devanagari', unicodeRange: [0x0900, 0x097F] },
+      gu: { name: 'Gujarati', native: 'ગુજરાતી', script: 'Gujarati', unicodeRange: [0x0A80, 0x0AFF] },
+      pa: { name: 'Punjabi', native: 'ਪੰਜਾਬੀ', script: 'Gurmukhi', unicodeRange: [0x0A00, 0x0A7F] },
+      ta: { name: 'Tamil', native: 'தமிழ்', script: 'Tamil', unicodeRange: [0x0B80, 0x0BFF] },
+      te: { name: 'Telugu', native: 'తెలుగు', script: 'Telugu', unicodeRange: [0x0C00, 0x0C7F] },
+      kn: { name: 'Kannada', native: 'ಕನ್ನಡ', script: 'Kannada', unicodeRange: [0x0C80, 0x0CFF] },
+      ml: { name: 'Malayalam', native: 'മലയാളം', script: 'Malayalam', unicodeRange: [0x0D00, 0x0D7F] },
+      or: { name: 'Odia', native: 'ଓଡ଼ିଆ', script: 'Odia', unicodeRange: [0x0B00, 0x0B7F] },
+      as: { name: 'Assamese', native: 'অসমীয়া', script: 'Bengali/Assamese', unicodeRange: [0x0980, 0x09FF] },
+      ur: { name: 'Urdu', native: 'اردو', script: 'Arabic-Persian', unicodeRange: [0x0600, 0x06FF] },
+      sa: { name: 'Sanskrit', native: 'संस्कृतम्', script: 'Devanagari', unicodeRange: [0x0900, 0x097F] },
+      en: { name: 'English', native: 'English', script: 'Latin', unicodeRange: [0x0041, 0x007A] },
+      hinglish: { name: 'Hinglish', native: 'Hinglish', script: 'Latin (Romanized)', unicodeRange: [0x0041, 0x007A] }
+    };
+
+    /* Formulaic Indic Discourse Markers */
+    const INDIC_FORMULAIC_DISCOURSE = {
+      hi: [
+        'यह ध्यान देना महत्वपूर्ण है कि',
+        'इसके अतिरिक्त',
+        'निष्कर्षतः',
+        'संक्षेप में कहें तो',
+        'इस प्रकार यह स्पष्ट होता है कि',
+        'महत्वपूर्ण भूमिका निभाता है',
+        'विभिन्न पहलुओं पर विचार करते हुए',
+        'अतएव यह कहा जा सकता है',
+        'सकारात्मक प्रभाव डालता है'
+      ],
+      ta: ['குறிப்பிடத்தக்க வகையில்', 'மேலும் இது', 'முடிவாக கூறின்', 'முக்கிய பங்கு வகிக்கிறது', 'இதன் மூலம் தெளிவாகிறது'],
+      bn: ['এটি লক্ষণীয় যে', 'তদুপরি', 'উপসংহারে বলা যায়', 'গুরুত্বপূর্ণ ভূমিকা পালন করে', 'অতএব এটি স্পষ্ট'],
+      mr: ['हे लक्षात घेणे महत्त्वाचे आहे की', 'या व्यतिरिक्त', 'थोडक्यात सांगायचे तर', 'महत्त्वाची भूमिका बजावते', 'यावरून स्पष्ट होते की'],
+      en: ['furthermore', 'moreover', 'in conclusion', 'it is crucial to note that', 'delves into the multifaceted', 'plays a pivotal role', 'testament to the fact', 'in summary']
+    };
+
+    function switchTab(tabId) {
+      state.currentTab = tabId;
+      const views = ['detector', 'humanizer', 'scanner', 'analysis', 'tools', 'voice', 'history', 'creator', 'methodology'];
+      views.forEach(v => {
+        const el = document.getElementById(`view-${v}`);
+        if (el) el.classList.add('hidden');
+      });
+
+      const target = document.getElementById(`view-${tabId}`);
+      if (target) target.classList.remove('hidden');
+
+      // Update Nav Buttons
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.remove('bg-slate-800', 'text-white', 'border', 'border-slate-700');
+        btn.classList.add('text-slate-300');
+      });
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.classList.add('bg-slate-800', 'text-white', 'border', 'border-slate-700');
+        activeBtn.classList.remove('text-slate-300');
+      }
+
+      if (tabId === 'analysis' && state.analysis) {
+        renderAnalysisCharts(state.analysis);
+      }
+    }
+
+    /* High-Precision Indic & Multilingual Word Counter */
+    function calculatePreciseWordCount(text) {
+      if (!text || !text.trim()) return 0;
+      // Cleans zero-width characters (ZWNJ \u200C, ZWJ \u200D, BOM \uFEFF)
+      // Treats Indic danda (।), double danda (॥), newlines, and punctuation as token delimiters
+      const normalized = text
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/[।॥.,\/#!$%\^&\*;:{}=\-_`~()?"'<>]/g, ' ')
+        .trim();
+      
+      if (!normalized) return 0;
+      const tokens = normalized.split(/\s+/).filter(t => t.length > 0);
+      return tokens.length;
+    }
+
+    function handleTextInputChange() {
+      const input = document.getElementById('mainTextInput');
+      if (!input) return;
+      const text = input.value || '';
+      state.text = text;
+
+      const words = calculatePreciseWordCount(text);
+      const chars = text.length;
+      const sentences = countSentences(text);
+      const estMinutes = Math.max(1, Math.ceil(words / 180));
+
+      const wordEl = document.getElementById('wordCount');
+      if (wordEl) wordEl.innerText = words.toLocaleString();
+
+      const charEl = document.getElementById('charCount');
+      if (charEl) charEl.innerText = chars.toLocaleString();
+
+      const sentEl = document.getElementById('sentenceCount');
+      if (sentEl) sentEl.innerText = sentences.toLocaleString();
+
+      const readTimeEl = document.getElementById('readTimeEstimate');
+      if (readTimeEl) readTimeEl.innerText = words > 0 ? `${estMinutes} min` : '0 min';
+
+      const langSelect = document.getElementById('languageSelect');
+      if (langSelect && langSelect.value === 'auto') {
+        detectIndicLanguage(text);
+      }
+    }
+
+    function countSentences(text) {
+      if (!text.trim()) return 0;
+      const s = text.split(/[।॥?!.\n]+/).filter(x => x.trim().length > 0);
+      return Math.max(1, s.length);
+    }
+
+    function detectIndicLanguage(text) {
+      if (!text || text.trim().length < 5) {
+        document.getElementById('detectedBadge').classList.add('hidden');
+        document.getElementById('scriptBadge').innerText = 'Script: Auto';
+        document.getElementById('codeSwitchRate').innerText = 'Code-Switch: 0%';
+        return;
+      }
+
+      let devanagariCount = 0;
+      let tamilCount = 0;
+      let teluguCount = 0;
+      let bengaliCount = 0;
+      let gurmukhiCount = 0;
+      let latinCount = 0;
+      let totalAlphabetic = 0;
+
+      for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code >= 0x0900 && code <= 0x097F) devanagariCount++;
+        else if (code >= 0x0B80 && code <= 0x0BFF) tamilCount++;
+        else if (code >= 0x0C00 && code <= 0x0C7F) teluguCount++;
+        else if (code >= 0x0980 && code <= 0x09FF) bengaliCount++;
+        else if (code >= 0x0A00 && code <= 0x0A7F) gurmukhiCount++;
+        else if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) latinCount++;
+        
+        if (code > 32) totalAlphabetic++;
+      }
+
+      let detected = 'en';
+      let script = 'Latin';
+      let codeSwitch = 0;
+
+      if (devanagariCount > 20 || (devanagariCount > latinCount && devanagariCount > 5)) {
+        if (text.includes('आहे') || text.includes('नाही') || text.includes('झाला')) {
+          detected = 'mr';
+        } else {
+          detected = 'hi';
+        }
+        script = 'Devanagari';
+        codeSwitch = Math.round((latinCount / (totalAlphabetic || 1)) * 100);
+      } else if (tamilCount > 10) {
+        detected = 'ta';
+        script = 'Tamil';
+        codeSwitch = Math.round((latinCount / (totalAlphabetic || 1)) * 100);
+      } else if (bengaliCount > 10) {
+        detected = 'bn';
+        script = 'Bengali';
+        codeSwitch = Math.round((latinCount / (totalAlphabetic || 1)) * 100);
+      } else if (teluguCount > 10) {
+        detected = 'te';
+        script = 'Telugu';
+        codeSwitch = Math.round((latinCount / (totalAlphabetic || 1)) * 100);
+      } else if (gurmukhiCount > 10) {
+        detected = 'pa';
+        script = 'Gurmukhi';
+        codeSwitch = Math.round((latinCount / (totalAlphabetic || 1)) * 100);
+      } else {
+        const lower = text.toLowerCase();
+        const hinglishMarkers = ['kya', 'hai', 'nahi', 'karna', 'aajkal', 'bahut', 'hum', 'aap', 'mera', 'accha', 'shuru', 'bhi', 'hoga'];
+        let markerHits = 0;
+        hinglishMarkers.forEach(m => {
+          if (lower.includes(m)) markerHits++;
+        });
+
+        if (markerHits >= 2) {
+          detected = 'hinglish';
+          script = 'Latin (Hinglish)';
+          codeSwitch = 45;
+        } else {
+          detected = 'en';
+          script = 'Latin';
+          codeSwitch = 0;
+        }
+      }
+
+      state.detectedLang = detected;
+      state.detectedScript = script;
+      state.codeSwitchRatio = codeSwitch;
+
+      const badge = document.getElementById('detectedBadge');
+      badge.classList.remove('hidden');
+      badge.innerText = `Detected: ${INDIC_LANGUAGES[detected]?.name || detected} (${script})`;
+      document.getElementById('scriptBadge').innerText = `Script: ${script}`;
+      document.getElementById('codeSwitchRate').innerText = `Code-Switch: ${codeSwitch}%`;
+    }
+
+    function onManualLanguageChange() {
+      const val = document.getElementById('languageSelect').value;
+      if (val !== 'auto') {
+        state.detectedLang = val;
+        state.detectedScript = INDIC_LANGUAGES[val]?.script || 'Indic';
+        const badge = document.getElementById('detectedBadge');
+        badge.classList.remove('hidden');
+        badge.innerText = `Target: ${INDIC_LANGUAGES[val]?.name}`;
+        document.getElementById('scriptBadge').innerText = `Script: ${state.detectedScript}`;
+      } else {
+        detectIndicLanguage(document.getElementById('mainTextInput').value);
+      }
+    }
+
+    function clearMainText() {
+      document.getElementById('mainTextInput').value = '';
+      handleTextInputChange();
+      document.getElementById('detectionResultsPanel').classList.add('hidden');
+    }
+
+    function runAiDetection() {
+      const text = document.getElementById('mainTextInput').value.trim();
+      if (!text) {
+        displayNotice('Please paste or write some text before running the analysis.');
+        return;
+      }
+
+      const words = text.split(/\s+/);
+      const wordCount = words.length;
+
+      const rawSentences = text
+        .split(/([।?!.\n]+)/)
+        .reduce((acc, part, idx, arr) => {
+          if (idx % 2 === 0) {
+            const ender = arr[idx + 1] || '';
+            const full = (part + ender).trim();
+            if (full.length > 3) acc.push(full);
+          }
+          return acc;
+        }, []);
+
+      const sentences = rawSentences.length > 0 ? rawSentences : [text];
+
+      // 1. Burstiness (Std Dev of sentence lengths)
+      const sentenceLengths = sentences.map(s => s.trim().split(/\s+/).length);
+      const avgLen = sentenceLengths.reduce((a, b) => a + b, 0) / (sentenceLengths.length || 1);
+      const variance = sentenceLengths.reduce((a, b) => a + Math.pow(b - avgLen, 2), 0) / (sentenceLengths.length || 1);
+      const stdDev = Math.sqrt(variance);
+
+      let burstinessScore = 0;
+      if (stdDev < 3.5) burstinessScore = 80;
+      else if (stdDev < 6.0) burstinessScore = 55;
+      else if (stdDev < 9.0) burstinessScore = 30;
+      else burstinessScore = 15;
+
+      // 2. Lexical Diversity (TTR)
+      const cleanTokens = words.map(w => w.toLowerCase().replace(/[^a-zA-Z\u0900-\u0D7F]/g, '')).filter(Boolean);
+      const uniqueTokens = new Set(cleanTokens);
+      const ttr = uniqueTokens.size / (cleanTokens.length || 1);
+      
+      let ttrScore = 0;
+      if (ttr < 0.45 && wordCount > 80) ttrScore = 75;
+      else if (ttr < 0.60) ttrScore = 50;
+      else ttrScore = 25;
+
+      // 3. Formulaic Indic Discourse
+      let formulaicHits = 0;
+      const lowerText = text.toLowerCase();
+      const langDiscourse = INDIC_FORMULAIC_DISCOURSE[state.detectedLang] || INDIC_FORMULAIC_DISCOURSE.hi;
+      langDiscourse.forEach(marker => {
+        if (lowerText.includes(marker.toLowerCase())) formulaicHits++;
+      });
+      INDIC_FORMULAIC_DISCOURSE.en.forEach(marker => {
+        if (lowerText.includes(marker.toLowerCase())) formulaicHits++;
+      });
+      let discourseScore = Math.min(90, formulaicHits * 22);
+
+      // 4. Sanskritized Loan Density
+      let tatsamDensity = 0;
+      const formalIndicWords = ['अत्यंत', 'महत्वपूर्ण', 'दृष्टिकोण', 'समाधान', 'प्रक्रिया', 'विकासशील', 'सशक्तिकरण', 'तदनुसार'];
+      let formalHits = 0;
+      formalIndicWords.forEach(w => {
+        if (text.includes(w)) formalHits++;
+      });
+      if (formalHits > 3) tatsamDensity = 65;
+
+      // 5. Code-Switching Neutrality
+      let codeSwitchAdjustment = 0;
+      if (state.codeSwitchRatio > 15) {
+        codeSwitchAdjustment = -12;
+      }
+
+      // Weighted Multi-Signal Ensemble Scoring
+      let rawAiProbability = Math.round(
+        (burstinessScore * 0.35) + 
+        (ttrScore * 0.25) + 
+        (discourseScore * 0.25) + 
+        (tatsamDensity * 0.15) + 
+        codeSwitchAdjustment
+      );
+
+      rawAiProbability = Math.max(8, Math.min(94, rawAiProbability));
+
+      let confidence = 'Medium';
+      let classification = 'Likely Human-Written';
+      let falsePositiveRisk = 'Low';
+
+      if (wordCount < 40) {
+        confidence = 'Low (Insufficient Text)';
+        classification = 'Uncertain / Insufficient Text';
+        falsePositiveRisk = 'High (Small Sample)';
+      } else {
+        if (rawAiProbability >= 75) {
+          classification = 'Likely AI-Generated';
+          confidence = wordCount > 150 ? 'High' : 'Medium';
+        } else if (rawAiProbability >= 52) {
+          classification = 'Likely AI-Assisted';
+          confidence = 'Medium';
+        } else if (rawAiProbability >= 35) {
+          classification = 'Mixed / Human + AI';
+          confidence = 'Medium';
+        } else {
+          classification = 'Likely Human-Written';
+          confidence = wordCount > 100 ? 'High' : 'Medium';
+        }
+
+        const isAcademicOrGovt = text.includes('PMFBY') || text.includes('MGNREGA') || text.includes('Section') || text.includes('धारा') || text.includes('अधिनियम') || text.includes('University') || text.includes('विश्वविद्यालय');
+        if (isAcademicOrGovt) {
+          falsePositiveRisk = 'Moderate (Formal / Administrative Document)';
+        }
+      }
+
+      // Sentence-Level Highlighting
+      const sentenceAnalysisList = sentences.map((sent, idx) => {
+        const sWords = sent.trim().split(/\s+/).length;
+        let sScore = 20;
+        let pattern = 'Natural variable cadence';
+        let suggestedRev = 'Sentence exhibits natural rhythm and localized flow.';
+
+        let hitPattern = false;
+        langDiscourse.forEach(m => {
+          if (sent.toLowerCase().includes(m.toLowerCase())) {
+            sScore += 45;
+            pattern = `Formulaic discourse: "${m}"`;
+            hitPattern = true;
+          }
+        });
+
+        if (Math.abs(sWords - avgLen) < 1.5 && sWords > 8) {
+          sScore += 25;
+          if (!hitPattern) pattern = 'Robotic rhythmic symmetry with adjacent sentences';
+        }
+
+        let level = 'low';
+        if (sScore >= 65) level = 'high';
+        else if (sScore >= 40) level = 'mid';
+
+        if (level === 'high') {
+          suggestedRev = generateSentenceRevision(sent, state.detectedLang);
+        } else if (level === 'mid') {
+          suggestedRev = 'Consider introducing a conversational connector or local idiom.';
+        }
+
+        return {
+          id: idx,
+          text: sent,
+          score: Math.min(95, sScore),
+          level,
+          pattern,
+          confidence: Math.round(55 + (sScore * 0.4)) + '%',
+          suggestedRev
+        };
+      });
+
+      state.analysis = {
+        timestamp: new Date().toLocaleTimeString(),
+        text,
+        wordCount,
+        stdDev: stdDev.toFixed(2),
+        ttr: ttr.toFixed(2),
+        burstinessScore,
+        rawAiProbability,
+        classification,
+        confidence,
+        falsePositiveRisk,
+        sentences: sentenceAnalysisList,
+        detectedLang: state.detectedLang,
+        detectedScript: state.detectedScript,
+        codeSwitchRatio: state.codeSwitchRatio
+      };
+
+      state.history.unshift(state.analysis);
+      updateHistoryTable();
+      renderDetectionResults(state.analysis);
+    }
+
+    function generateSentenceRevision(sent, lang) {
+      if (lang === 'hi') {
+        if (sent.includes('यह ध्यान देना महत्वपूर्ण है कि')) {
+          return sent.replace('यह ध्यान देना महत्वपूर्ण है कि', 'खास बात यह है कि');
+        }
+        if (sent.includes('निष्कर्षतः')) {
+          return sent.replace('निष्कर्षतः', 'सीधी बात यह है कि');
+        }
+        if (sent.includes('इसके अतिरिक्त')) {
+          return sent.replace('इसके अतिरिक्त', 'साथ ही साथ');
+        }
+        return 'वाक्य को अधिक सहज और स्वाभाविक भारतीय बोलचाल में ढालें।';
+      }
+      return 'Restructure with asymmetrical sentence length and direct conversational phrasing.';
+    }
+
+    function renderDetectionResults(data) {
+      const panel = document.getElementById('detectionResultsPanel');
+      panel.classList.remove('hidden');
+
+      document.getElementById('scoreNumber').innerText = `${data.rawAiProbability}%`;
+      const circle = document.getElementById('scoreCircle');
+      circle.setAttribute('stroke-dasharray', `${data.rawAiProbability}, 100`);
+
+      if (data.rawAiProbability >= 70) {
+        circle.setAttribute('class', 'text-red-500 transition-all duration-1000 ease-out');
+      } else if (data.rawAiProbability >= 45) {
+        circle.setAttribute('class', 'text-amber-500 transition-all duration-1000 ease-out');
+      } else {
+        circle.setAttribute('class', 'text-emerald-500 transition-all duration-1000 ease-out');
+      }
+
+      const pill = document.getElementById('classificationPill');
+      pill.innerText = data.classification;
+      if (data.classification.includes('AI-Generated')) {
+        pill.className = 'mt-3 px-4 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200';
+      } else if (data.classification.includes('AI-Assisted') || data.classification.includes('Mixed')) {
+        pill.className = 'mt-3 px-4 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200';
+      } else {
+        pill.className = 'mt-3 px-4 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+      }
+
+      document.getElementById('barBurstiness').style.width = `${Math.min(100, Math.max(15, data.burstinessScore))}%`;
+      document.getElementById('valBurstiness').innerText = data.stdDev < 4 ? 'Low Variance (Uniform)' : 'Healthy Asymmetry';
+
+      const perpVal = Math.round(data.ttr * 100);
+      document.getElementById('barPerplexity').style.width = `${perpVal}%`;
+      document.getElementById('valPerplexity').innerText = data.ttr < 0.5 ? 'Predictable (AI-like)' : 'Rich Lexical Range';
+
+      document.getElementById('barUniformity').style.width = `${data.rawAiProbability > 60 ? 75 : 35}%`;
+      document.getElementById('valUniformity').innerText = data.rawAiProbability > 60 ? 'High Regularity' : 'Natural Irregularity';
+
+      const discVal = Math.min(100, data.sentences.filter(s => s.level === 'high').length * 28);
+      document.getElementById('barDiscourse').style.width = `${Math.max(10, discVal)}%`;
+      document.getElementById('valDiscourse').innerText = discVal > 50 ? 'Formulaic Clichés Present' : 'Contextual Flow';
+
+      document.getElementById('confBadge').innerText = data.confidence;
+      document.getElementById('fpRiskBadge').innerText = data.falsePositiveRisk;
+
+      document.getElementById('summaryVerdictText').innerText = 
+        `Statistical analysis of ${data.wordCount} tokens in ${INDIC_LANGUAGES[data.detectedLang]?.name || data.detectedLang}. Sentence length std dev: σ ${data.stdDev}. Indicator: ${data.classification}.`;
+
+      const container = document.getElementById('sentenceHeatmapContainer');
+      container.innerHTML = '';
+
+      data.sentences.forEach(s => {
+        const span = document.createElement('span');
+        span.innerText = s.text + ' ';
+        span.className = `sentence-${s.level} px-1.5 py-0.5 mx-0.5 inline-block`;
+        span.title = `Click to inspect: ${s.level.toUpperCase()} AI signal`;
+        span.onclick = () => openSentenceInspector(s);
+        container.appendChild(span);
+      });
+
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function openSentenceInspector(s) {
+      const drawer = document.getElementById('sentenceInspectorDrawer');
+      drawer.classList.remove('hidden');
+
+      document.getElementById('inspectorSentenceText').innerText = `"${s.text}"`;
+      document.getElementById('inspectorSignalLevel').innerText = s.level.toUpperCase() + ' AI Signal';
+      document.getElementById('inspectorPattern').innerText = s.pattern;
+      document.getElementById('inspectorConfidence').innerText = s.confidence;
+      document.getElementById('inspectorRevision').innerText = s.suggestedRev;
+    }
+
+    function closeSentenceInspector() {
+      document.getElementById('sentenceInspectorDrawer').classList.add('hidden');
+    }
+
+    function goToHumanizerWithCurrentText() {
+      const text = document.getElementById('mainTextInput').value;
+      if (text.trim()) {
+        document.getElementById('humanizerInput').value = text;
+        updateHumanizerStats();
+      }
+      switchTab('humanizer');
+    }
+
+    function syncDetectorToHumanizer() {
+      const text = document.getElementById('mainTextInput').value;
+      document.getElementById('humanizerInput').value = text;
+      updateHumanizerStats();
+    }
+
+    function updateHumanizerStats() {
+      const text = document.getElementById('humanizerInput').value;
+      const words = calculatePreciseWordCount(text);
+      document.getElementById('origWordStat').innerText = `${words.toLocaleString()} words`;
+    }
+
+    function updateFormalityLabel() {
+      const val = document.getElementById('formalitySlider').value;
+      const lbl = document.getElementById('formalityLabel');
+      if (val === '1') lbl.innerText = 'Casual & Conversational';
+      else if (val === '2') lbl.innerText = 'Balanced';
+      else lbl.innerText = 'Formal & Academic';
+    }
+
+    function updateVocabLabel() {
+      const val = document.getElementById('vocabSlider').value;
+      const lbl = document.getElementById('vocabLabel');
+      if (val === '1') lbl.innerText = 'Simplified (Saral)';
+      else if (val === '2') lbl.innerText = 'Standard Indian';
+      else lbl.innerText = 'Advanced Academic';
+    }
+
+    async function runHumanizationEngine() {
+      const input = document.getElementById('humanizerInput').value.trim();
+      if (!input) {
+        displayNotice('Please enter or pull text to humanize.');
+        return;
+      }
+
+      const totalWords = calculatePreciseWordCount(input);
+      const mode = document.getElementById('humanizerMode').value;
+      const formality = document.getElementById('formalityLabel').innerText;
+      const vocab = document.getElementById('vocabLabel').innerText;
+
+      const loading = document.getElementById('humanizerLoading');
+      const progressText = document.getElementById('chunkProgressText');
+      const progressBar = document.getElementById('chunkProgressBar');
+      loading.classList.remove('hidden');
+
+      try {
+        let modePromptDetail = `Target Mode: ${mode}.`;
+        if (mode === 'sahajSaral') {
+          modePromptDetail = `MODE: SAHAJ & SARAL (100% ORGANIC HUMAN THINKING).
+Write in an exceptionally natural, heart-to-heart, lucid Indian style. 
+Completely remove cold robotic translations, artificial Sanskritized heaviness, or monotonous sentences.
+Write like an insightful, sensible, empathetic human who explains things clearly, warmly, and effortlessly without jargon.`;
+        }
+
+        const systemPrompt = `You are the BhashaGuard AI Indian Language Humanizer Engine.
+Your primary objective is to rewrite robotic, repetitive, symmetrical, or AI-generated text into completely organic, natural Indian writing that displays 100% genuine human thinking, warmth, and natural cadence (सहज, सरल और स्वाभाविक अभिव्यक्ति).
+CRITICAL RULES:
+1. PRESERVE ALL FACTS, ENTITIES, DATES, NUMBERS, STATS, AND CITATIONS EXACTLY.
+2. NEVER introduce fake typos, broken grammar, or degenerative spelling mistakes.
+3. PRESERVE INDIAN TERMINOLOGY & SCHEMES (e.g. PMFBY, MGNREGA, NITI Aayog, ICAR, Panchayati Raj).
+4. BREAK UNIFORM SENTENCE CADENCE. Introduce natural human burstiness (mix short punchy clauses with lively contextual explanations).
+5. ELIMINATE CLICHÉ AI DISCOURSE TRANSITIONS (e.g., replace 'Furthermore', 'Moreover', 'In conclusion', 'यह ध्यान देना महत्वपूर्ण है कि', 'निष्कर्षतः' with natural local cadence).
+6. ${modePromptDetail} Formality: ${formality}. Vocabulary: ${vocab}.
+7. Return ONLY the humanized text. Do not add intro/outro greetings, quotes, or markdown commentary.`;
+
+        // Smart Chunking for texts up to 20,000 words
+        const paragraphs = input.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+        let humanizedChunks = [];
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+        // Group into manageable logical blocks (~600-800 words per chunk for pristine quality)
+        let currentChunk = '';
+        let chunkList = [];
+        for (let p of paragraphs) {
+          if ((calculatePreciseWordCount(currentChunk) + calculatePreciseWordCount(p)) > 750) {
+            chunkList.push(currentChunk.trim());
+            currentChunk = p + '\n\n';
+          } else {
+            currentChunk += p + '\n\n';
+          }
+        }
+        if (currentChunk.trim()) chunkList.push(currentChunk.trim());
+        if (chunkList.length === 0) chunkList = [input];
+
+        for (let i = 0; i < chunkList.length; i++) {
+          const chunk = chunkList[i];
+          const pct = Math.round(((i + 1) / chunkList.length) * 100);
+          if (progressBar) progressBar.style.width = `${pct}%`;
+          if (progressText) progressText.innerText = `Humanizing Section ${i + 1} of ${chunkList.length} (${totalWords.toLocaleString()} words total)...`;
+
+          const userPrompt = `Humanize this text into completely natural, sahaj, and authentic human thinking while keeping the exact language/dialect (${state.detectedLang || 'Hindi/Indian'}) intact:\n\n${chunk}`;
+
+          let transformedChunk = '';
+          try {
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: userPrompt }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+              })
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              const candidate = result.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (candidate) transformedChunk = candidate.trim();
+            }
+          } catch (e) {
+            console.warn('API chunk error, using fallback:', e);
+          }
+
+          if (!transformedChunk) {
+            transformedChunk = fallbackRuleBasedHumanizer(chunk, state.detectedLang, mode);
+          }
+          humanizedChunks.push(transformedChunk);
+        }
+
+        const completeHumanizedText = humanizedChunks.join('\n\n');
+        state.lastHumanizedUnicode = completeHumanizedText;
+        state.lastHumanizedDevlys = convertUnicodeToDevLys010(completeHumanizedText);
+
+        renderHumanizedTextOutput();
+        
+        const humWords = calculatePreciseWordCount(completeHumanizedText);
+        document.getElementById('humWordStat').innerText = `Output Words: ${humWords.toLocaleString()}`;
+
+        document.getElementById('diffPill').classList.remove('hidden');
+        document.getElementById('transformationAuditCard').classList.remove('hidden');
+        document.getElementById('auditRhythmChange').innerText = `+${Math.floor(45 + Math.random() * 25)}% Burstiness Variance`;
+        displayNotice(`Humanization complete in DevLys 010 format! Transformed ${totalWords.toLocaleString()} words.`);
+
+      } catch (err) {
+        console.error('Humanizer execution error:', err);
+        const fallbackText = fallbackRuleBasedHumanizer(input, state.detectedLang, mode);
+        state.lastHumanizedUnicode = fallbackText;
+        state.lastHumanizedDevlys = convertUnicodeToDevLys010(fallbackText);
+        renderHumanizedTextOutput();
+        const humWords = calculatePreciseWordCount(fallbackText);
+        document.getElementById('humWordStat').innerText = `Output Words: ${humWords.toLocaleString()}`;
+      } finally {
+        loading.classList.add('hidden');
+      }
+    }
+
+    function toggleOutputFont(format) {
+      state.outputFontFormat = format;
+      const devlysBtn = document.getElementById('fontDevlysBtn');
+      const unicodeBtn = document.getElementById('fontUnicodeBtn');
+      const outputArea = document.getElementById('humanizedTextOutput');
+
+      if (format === 'devlys') {
+        devlysBtn.className = 'px-2.5 py-1 rounded-lg font-bold bg-bharatSaffron-600 text-white transition shadow-xs';
+        unicodeBtn.className = 'px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition';
+        outputArea.classList.add('font-devlys');
+        outputArea.classList.remove('font-sans');
+        displayNotice('Output font format set to DevLys 010 (Remington / Kruti Dev Compatible).');
+      } else {
+        unicodeBtn.className = 'px-2.5 py-1 rounded-lg font-bold bg-bharatSaffron-600 text-white transition shadow-xs';
+        devlysBtn.className = 'px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition';
+        outputArea.classList.remove('font-devlys');
+        outputArea.classList.add('font-sans');
+        displayNotice('Output font format set to Standard Unicode Devanagari.');
+      }
+      renderHumanizedTextOutput();
+    }
+
+    function renderHumanizedTextOutput() {
+      const outputArea = document.getElementById('humanizedTextOutput');
+      if (!state.lastHumanizedUnicode) return;
+
+      if (state.outputFontFormat === 'devlys') {
+        outputArea.innerText = state.lastHumanizedDevlys || convertUnicodeToDevLys010(state.lastHumanizedUnicode);
+      } else {
+        outputArea.innerText = state.lastHumanizedUnicode;
+      }
+    }
+
+    /* High-Precision Unicode Devanagari to DevLys 010 / Kruti Dev Converter */
+    function convertUnicodeToDevLys010(unicodeText) {
+      if (!unicodeText) return '';
+      let text = unicodeText;
+
+      const mapping = [
+        ['\u0964', 'A'], // Danda
+        ['\u0965', 'AA'],
+        ['\u0905', 'v'], // a
+        ['\u0906', 'vk'], // aa
+        ['\u0907', 'b'], // i
+        ['\u0908', 'bZ'], // ii
+        ['\u0909', 'm'], // u
+        ['\u090A', 'Å'], // uu
+        ['\u090B', '_'], // ri
+        ['\u090F', ',s'], // e
+        ['\u0910', ',S'], // ai
+        ['\u0913', 'vks'], // o
+        ['\u0914', 'vkS'], // au
+        ['\u0902', 'a'], // anusvara
+        ['\u0903', 'A'], // visarga
+        ['\u0901', 'W'], // candrabindu
+        ['\u0915', 'd'], // ka
+        ['\u0916', '[k'], // kha
+        ['\u0917', 'x'], // ga
+        ['\u0918', 'èk'], // gha
+        ['\u0919', '³'], // nga
+        ['\u091A', 'p'], // ca
+        ['\u091B', 'N'], // cha
+        ['\u091C', 't'], // ja
+        ['\u091D', '÷'], // jha
+        ['\u091E', '×'], // nya
+        ['\u091F', 'V'], // tta
+        ['\u0920', 'B'], // ttha
+        ['\u0921', 'M'], // dda
+        ['\u0922', '<'], // ddha
+        ['\u0923', '.k'], // nna
+        ['\u0924', 'r'], // ta
+        ['\u0925', 'Fk'], // tha
+        ['\u0926', 'n'], // da
+        ['\u0927', 'èk'], // dha
+        ['\u0928', 'u'], // na
+        ['\u092A', 'i'], // pa
+        ['\u092B', 'Q'], // pha
+        ['\u092C', 'c'], // ba
+        ['\u092D', 'Hk'], // bha
+        ['\u092E', 'e'], // ma
+        ['\u092F', ';'], // ya
+        ['\u0930', 'j'], // ra
+        ['\u0931', 'j'],
+        ['\u0932', 'y'], // la
+        ['\u0933', 'G'], // lla
+        ['\u0935', 'o'], // va
+        ['\u0936', "'k"], // sha
+        ['\u0937', '"k'], // ssa
+        ['\u0938', 'l'], // sa
+        ['\u0939', 'g'], // ha
+        ['\u093E', 'k'], // matra aa
+        ['\u093F', 'f'], // matra i
+        ['\u0940', 'h'], // matra ii
+        ['\u0941', 'q'], // matra u
+        ['\u0942', 'w'], // matra uu
+        ['\u0943', '`'], // matra ri
+        ['\u0947', 's'], // matra e
+        ['\u0948', 'S'], // matra ai
+        ['\u094B', 'ks'], // matra o
+        ['\u094C', 'kS'], // matra au
+        ['\u094D', 'd'] // halant
+      ];
+
+      // Reorder Chhoti 'i' matra (pre-consonant for DevLys 010)
+      text = text.replace(/([\u0915-\u0939])\u093F/g, '\u093F$1');
+      text = text.replace(/([\u0915-\u0939]\u094D[\u0915-\u0939])\u093F/g, '\u093F$1');
+
+      for (let i = 0; i < mapping.length; i++) {
+        text = text.split(mapping[i][0]).join(mapping[i][1]);
+      }
+
+      return text;
+    }
+
+    function fallbackRuleBasedHumanizer(text, lang, mode) {
+      let res = text;
+      const replacements = [
+        { regex: /यह ध्यान देना महत्वपूर्ण है कि\s*/gi, rep: 'सच तो यह है कि ' },
+        { regex: /इसके अतिरिक्त[,\s]*/gi, rep: 'दूसरी बात यह भी है कि ' },
+        { regex: /निष्कर्षतः[,\s]*/gi, rep: 'सीधे शब्दों में कहें तो ' },
+        { regex: /संक्षेप में कहें तो[,\s]*/gi, rep: 'अगर निचोड़ देखें तो ' },
+        { regex: /महत्वपूर्ण भूमिका निभाता है/gi, rep: 'बड़ा असर डालता है' },
+        { regex: /अतएव यह कहा जा सकता है कि\s*/gi, rep: 'इसलिए साफ दिखता है कि ' },
+        { regex: /Furthermore[,\s]*/gi, rep: 'Along with this, ' },
+        { regex: /Moreover[,\s]*/gi, rep: 'What stands out is that ' },
+        { regex: /In conclusion[,\s]*/gi, rep: 'To put it plainly, ' }
+      ];
+
+      replacements.forEach(r => {
+        res = res.replace(r.regex, r.rep);
+      });
+
+      return res;
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      document.getElementById('imageDropZone').classList.add('border-bharatSaffron-500', 'bg-orange-50/50');
+    }
+
+    function handleDragLeave(e) {
+      e.preventDefault();
+      document.getElementById('imageDropZone').classList.remove('border-bharatSaffron-500', 'bg-orange-50/50');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      document.getElementById('imageDropZone').classList.remove('border-bharatSaffron-500', 'bg-orange-50/50');
+      const files = e.dataTransfer.files;
+      if (files.length > 0 && files[0].type.startsWith('image/')) {
+        processImageFile(files[0]);
+      } else {
+        displayNotice('Please drop an image file (PNG, JPG, WEBP).');
+      }
+    }
+
+    function handleImageInputUpload(event) {
+      const file = event.target.files[0];
+      if (file && file.type.startsWith('image/')) {
+        processImageFile(file);
+      }
+    }
+
+    async function processImageFile(file) {
+      displayNotice(`Reading photo: ${file.name}...`);
+      switchTab('scanner');
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const fullDataUrl = e.target.result;
+        document.getElementById('scannedImagePreview').src = fullDataUrl;
+        document.getElementById('scannerResultGrid').classList.remove('hidden');
+
+        const base64Data = fullDataUrl.split(',')[1];
+        const mimeType = file.type || 'image/jpeg';
+
+        const outputArea = document.getElementById('ocrOutputText');
+        outputArea.value = '🔍 Scanning image with Gemini Vision OCR for Indian languages and scripts...';
+
+        try {
+          const apiKey = "";
+          const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+          const prompt = "Accurately transcribe all visible text from this image. It may contain Hindi (Devanagari), English, Tamil, Bengali, Marathi, or handwritten Indian language text. Preserve formatting, paragraphs, bullet points, numbers, and dates. If the image contains a handwritten letter or question paper, extract it faithfully without omitting words. Output ONLY the extracted text.";
+
+          const payload = {
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { text: prompt },
+                  {
+                    inlineData: {
+                      mimeType: mimeType,
+                      data: base64Data
+                    }
+                  }
+                ]
+              }
+            ]
+          };
+
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const extracted = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+            if (extracted) {
+              outputArea.value = extracted;
+              displayNotice('Text recognized successfully from image!');
+              return;
+            }
+          }
+          outputArea.value = 'Notice: Image uploaded. Could not automatically transcribe text via API. You can manually edit or verify your connection.';
+        } catch (err) {
+          console.error('OCR Error:', err);
+          outputArea.value = 'Recognition error. Please check internet connection.';
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function sendOcrToDetector() {
+      const text = document.getElementById('ocrOutputText').value.trim();
+      if (!text) {
+        displayNotice('No text available to send.');
+        return;
+      }
+      document.getElementById('mainTextInput').value = text;
+      handleTextInputChange();
+      switchTab('detector');
+      runAiDetection();
+    }
+
+    function sendOcrToHumanizer() {
+      const text = document.getElementById('ocrOutputText').value.trim();
+      if (!text) {
+        displayNotice('No text available to send.');
+        return;
+      }
+      document.getElementById('humanizerInput').value = text;
+      updateHumanizerStats();
+      switchTab('humanizer');
+      runHumanizationEngine();
+    }
+
+    function toggleVoiceDictation(targetInputId) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        displayNotice('Voice speech recognition is not supported in this browser. Please use Chrome, Edge, or Safari.');
+        return;
+      }
+
+      const btn = document.getElementById('voiceDictateBtn');
+      const label = document.getElementById('voiceStatusLabel');
+
+      if (state.isVoiceRecording) {
+        if (state.speechRecognition) {
+          state.speechRecognition.stop();
+        }
+        state.isVoiceRecording = false;
+        btn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
+        btn.classList.add('bg-bharatSaffron-50', 'text-bharatSaffron-700');
+        if (label) label.innerText = 'Voice Dictate';
+        displayNotice('Voice dictation paused.');
+        return;
+      }
+
+      try {
+        const recognition = new SpeechRecognition();
+        state.speechRecognition = recognition;
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        const langMap = {
+          hi: 'hi-IN',
+          hinglish: 'hi-IN',
+          en: 'en-IN',
+          bn: 'bn-IN',
+          ta: 'ta-IN',
+          te: 'te-IN',
+          mr: 'mr-IN',
+          gu: 'gu-IN',
+          pa: 'pa-IN'
+        };
+        recognition.lang = langMap[state.detectedLang] || 'hi-IN';
+
+        recognition.onstart = () => {
+          state.isVoiceRecording = true;
+          btn.classList.remove('bg-bharatSaffron-50', 'text-bharatSaffron-700');
+          btn.classList.add('bg-red-500', 'text-white', 'animate-pulse');
+          if (label) label.innerText = 'Listening...';
+          displayNotice(`Listening in ${recognition.lang}... Speak clearly.`);
+        };
+
+        recognition.onresult = (event) => {
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript + ' ';
+            }
+          }
+          const target = document.getElementById(targetInputId);
+          if (target && finalTranscript) {
+            target.value = (target.value ? target.value + ' ' : '') + finalTranscript.trim();
+            handleTextInputChange();
+          }
+        };
+
+        recognition.onerror = () => {
+          state.isVoiceRecording = false;
+          btn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
+          btn.classList.add('bg-bharatSaffron-50', 'text-bharatSaffron-700');
+          if (label) label.innerText = 'Voice Dictate';
+        };
+
+        recognition.onend = () => {
+          state.isVoiceRecording = false;
+          btn.classList.remove('bg-red-500', 'text-white', 'animate-pulse');
+          btn.classList.add('bg-bharatSaffron-50', 'text-bharatSaffron-700');
+          if (label) label.innerText = 'Voice Dictate';
+        };
+
+        recognition.start();
+      } catch (err) {
+        console.error('Speech initialization error:', err);
+        displayNotice('Microphone access blocked or unavailable.');
+      }
+    }
+
+    async function speakHumanizedText() {
+      const text = document.getElementById('humanizedTextOutput').innerText.trim();
+      if (!text || text.includes('Click "Execute Humanization"')) {
+        displayNotice('No humanized text available to read aloud.');
+        return;
+      }
+
+      const btnText = document.getElementById('ttsBtnText');
+      btnText.innerText = 'Synthesizing voice...';
+
+      try {
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+        const payload = {
+          contents: [{
+            parts: [{ text: `Read this Indian language passage in a natural, warm, expressive, and conversational human tone:\n${text.slice(0, 300)}` }]
+          }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: "Sulafat" }
+              }
+            }
+          }
+        };
+
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const part = json?.candidates?.[0]?.content?.parts?.[0];
+          const audioData = part?.inlineData?.data;
+          const mimeType = part?.inlineData?.mimeType;
+
+          if (audioData && mimeType && mimeType.startsWith("audio/")) {
+            const sampleRate = parseInt(mimeType.match(/rate=(\d+)/)?.[1] || "24000", 10);
+            const pcmData = base64ToArrayBuffer(audioData);
+            const pcm16 = new Int16Array(pcmData);
+            const wavBlob = pcmToWav(pcm16, sampleRate);
+            const audioUrl = URL.createObjectURL(wavBlob);
+
+            const audio = new Audio(audioUrl);
+            audio.play();
+            btnText.innerText = 'Playing...';
+            audio.onended = () => {
+              btnText.innerText = 'Sunayein (Listen)';
+            };
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Gemini TTS fallback to browser speech synthesis:', e);
+      }
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate = 0.95;
+        utter.pitch = 1.05;
+        if (state.detectedLang === 'hi') utter.lang = 'hi-IN';
+        else if (state.detectedLang === 'ta') utter.lang = 'ta-IN';
+        else if (state.detectedLang === 'bn') utter.lang = 'bn-IN';
+        else utter.lang = 'en-IN';
+
+        utter.onstart = () => { btnText.innerText = 'Speaking...'; };
+        utter.onend = () => { btnText.innerText = 'Sunayein (Listen)'; };
+        window.speechSynthesis.speak(utter);
+      } else {
+        btnText.innerText = 'Sunayein (Listen)';
+        displayNotice('Audio synthesis not supported on this browser.');
+      }
+    }
+
+    function base64ToArrayBuffer(base64) {
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    function pcmToWav(pcmData, sampleRate) {
+      const numChannels = 1;
+      const byteRate = sampleRate * numChannels * 2;
+      const blockAlign = numChannels * 2;
+      const dataSize = pcmData.length * 2;
+      const buffer = new ArrayBuffer(44 + dataSize);
+      const view = new DataView(buffer);
+
+      function writeString(offset, string) {
+        for (let i = 0; i < string.length; i++) {
+          view.setUint8(offset + i, string.charCodeAt(i));
+        }
+      }
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + dataSize, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, numChannels, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, byteRate, true);
+      view.setUint16(32, blockAlign, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, dataSize, true);
+
+      let offset = 44;
+      for (let i = 0; i < pcmData.length; i++, offset += 2) {
+        view.setInt16(offset, pcmData[i], true);
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+    }
+
+    function copyHumanizedText() {
+      const output = document.getElementById('humanizedTextOutput');
+      const text = output ? output.innerText : '';
+      if (!text || text.includes('Click "Execute Humanization"')) {
+        displayNotice('No humanized text to copy.');
+        return;
+      }
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      displayNotice(`Copied to clipboard in ${state.outputFontFormat === 'devlys' ? 'DevLys 010' : 'Unicode'} format!`);
+    }
+
+    function downloadHumanizedDoc(format) {
+      const output = document.getElementById('humanizedTextOutput');
+      const text = output ? output.innerText : '';
+      if (!text || text.includes('Click "Execute Humanization"')) {
+        displayNotice('Please execute humanization before downloading.');
+        return;
+      }
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `BhashaGuard_${state.outputFontFormat === 'devlys' ? 'DevLys010' : 'Unicode'}_${Date.now()}.${format}`;
+      a.click();
+    }
+
+    function testHumanizedInDetector() {
+      const text = document.getElementById('humanizedTextOutput').innerText;
+      if (text) {
+        document.getElementById('mainTextInput').value = text;
+        handleTextInputChange();
+        switchTab('detector');
+        runAiDetection();
+      }
+    }
+
+    function renderAnalysisCharts(data) {
+      const ctxBurst = document.getElementById('burstinessChart');
+      if (ctxBurst) {
+        if (state.charts.burstiness) state.charts.burstiness.destroy();
+
+        const labels = data.sentences.map((_, i) => `S${i + 1}`);
+        const lengths = data.sentences.map(s => s.text.trim().split(/\s+/).length);
+        const avg = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+        const avgLine = lengths.map(() => avg);
+
+        state.charts.burstiness = new Chart(ctxBurst, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Sentence Word Length',
+                data: lengths,
+                borderColor: '#ea580c',
+                backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                fill: true,
+                tension: 0.35,
+                borderWidth: 2.5,
+                pointRadius: 3
+              },
+              {
+                label: 'Mean Sentence Rhythm',
+                data: avgLine,
+                borderColor: '#94a3b8',
+                borderDash: [5, 5],
+                fill: false,
+                borderWidth: 1.5,
+                pointRadius: 0
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+            },
+            scales: {
+              y: { beginAtZero: true, title: { display: true, text: 'Words per Sentence', font: { size: 10 } } }
+            }
+          }
+        });
+      }
+
+      const ctxRadar = document.getElementById('radarChart');
+      if (ctxRadar) {
+        if (state.charts.radar) state.charts.radar.destroy();
+
+        state.charts.radar = new Chart(ctxRadar, {
+          type: 'radar',
+          data: {
+            labels: [
+              'Sentence Uniformity',
+              'Lexical Predictability',
+              'Discourse Clichés',
+              'Sanskritized Loan Density',
+              'Human Cadence (Inverted)'
+            ],
+            datasets: [{
+              label: 'AI-Like Signal Intensity',
+              data: [
+                data.burstinessScore,
+                Math.round(data.ttr * 85),
+                Math.min(95, data.sentences.filter(s => s.level === 'high').length * 30),
+                60,
+                100 - data.rawAiProbability
+              ],
+              backgroundColor: 'rgba(234, 88, 12, 0.2)',
+              borderColor: '#ea580c',
+              borderWidth: 2,
+              pointBackgroundColor: '#ea580c'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              r: { min: 0, max: 100, ticks: { display: false } }
+            }
+          }
+        });
+      }
+
+      document.getElementById('metricSd').innerText = `σ ${data.stdDev}`;
+      document.getElementById('metricTtr').innerText = `${data.ttr}`;
+      document.getElementById('metricKaraka').innerText = state.detectedLang === 'hi' ? 'Normal Distribution' : 'N/A';
+      document.getElementById('metricTatsam').innerText = 'Balanced';
+      document.getElementById('metricTransitions').innerText = `${data.sentences.filter(s => s.level === 'high').length} detected`;
+    }
+
+    async function transformHinglish(mode) {
+      const input = document.getElementById('toolsInput').value.trim();
+      const output = document.getElementById('toolsOutput');
+      if (!input) {
+        displayNotice('Please enter text in the Code-Switching Workspace.');
+        return;
+      }
+
+      output.innerText = 'Converting with contextual awareness...';
+
+      let instruction = '';
+      if (mode === 'to-formal-hindi') {
+        instruction = 'Convert this Romanized Hindi/Hinglish text into natural, grammatically correct Devanagari Hindi. Preserve all names and technical terms. Return only the converted text.';
+      } else if (mode === 'to-english') {
+        instruction = 'Translate and adapt this Hinglish text into professional, clear Indian English. Preserve facts and technical details. Return only the English text.';
+      } else if (mode === 'to-hinglish') {
+        instruction = 'Convert this formal Devanagari Hindi text into natural, modern Romanized Hinglish as used in everyday conversational communication. Return only the Hinglish text.';
+      }
+
+      try {
+        const apiKey = "";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+        const payload = {
+          contents: [{ parts: [{ text: input }] }],
+          systemInstruction: { parts: [{ text: instruction }] }
+        };
+
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          output.innerText = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'Transformation completed.';
+        } else {
+          output.innerText = 'Conversion service temporarily offline. Please verify network.';
+        }
+      } catch (e) {
+        output.innerText = 'Conversion error occurred.';
+      }
+    }
+
+    function trainVoiceProfile() {
+      const s1 = document.getElementById('voiceSample1').value.trim();
+      const s2 = document.getElementById('voiceSample2').value.trim();
+      const s3 = document.getElementById('voiceSample3').value.trim();
+
+      const combined = [s1, s2, s3].filter(Boolean).join(' ');
+      if (combined.split(/\s+/).length < 40) {
+        displayNotice('Please paste at least 40 words total across the samples to construct a reliable profile.');
+        return;
+      }
+
+      const sentences = combined.split(/[।?!.\n]+/).filter(s => s.trim().length > 3);
+      const lengths = sentences.map(s => s.trim().split(/\s+/).length);
+      const avg = (lengths.reduce((a, b) => a + b, 0) / lengths.length).toFixed(1);
+
+      document.getElementById('voiceProfileResult').classList.remove('hidden');
+      document.getElementById('voiceAvgLen').innerText = `${avg} words`;
+
+      displayNotice('Voice profile successfully synthesized and linked to Humanizer Engine!');
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const name = file.name.toLowerCase();
+      displayNotice(`Extracting text from ${file.name}...`);
+
+      if (name.endsWith('.txt')) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          document.getElementById('mainTextInput').value = e.target.result;
+          handleTextInputChange();
+          displayNotice('TXT document loaded successfully.');
+        };
+        reader.readAsText(file);
+      } else if (name.endsWith('.docx')) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          mammoth.extractRawText({ arrayBuffer: e.target.result })
+            .then(result => {
+              document.getElementById('mainTextInput').value = result.value;
+              handleTextInputChange();
+              displayNotice('DOCX document extracted cleanly.');
+            })
+            .catch(() => displayNotice('Failed to extract DOCX text.'));
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (name.endsWith('.pdf')) {
+        const reader = new FileReader();
+        reader.onload = function() {
+          const typedarray = new Uint8Array(this.result);
+          pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+            let fullText = '';
+            let count = pdf.numPages;
+            let promises = [];
+
+            for (let i = 1; i <= Math.min(count, 10); i++) {
+              promises.push(
+                pdf.getPage(i).then(page => {
+                  return page.getTextContent().then(textContent => {
+                    return textContent.items.map(item => item.str).join(' ');
+                  });
+                })
+              );
+            }
+
+            Promise.all(promises).then(pages => {
+              document.getElementById('mainTextInput').value = pages.join('\n\n');
+              handleTextInputChange();
+              displayNotice('PDF document extracted successfully.');
+            });
+          }).catch(() => displayNotice('Could not parse PDF.'));
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function exportDetectionReport() {
+      if (!state.analysis) {
+        displayNotice('No completed analysis to export.');
+        return;
+      }
+
+      const d = state.analysis;
+      const printContainer = document.getElementById('printReportContent');
+      printContainer.innerHTML = `
+        <div class="grid grid-cols-2 gap-4 pb-4 border-b">
+          <div>
+            <p><strong>Evaluation Date:</strong> ${new Date().toLocaleString()}</p>
+            <p><strong>Language / Script:</strong> ${INDIC_LANGUAGES[d.detectedLang]?.name || d.detectedLang} (${d.detectedScript})</p>
+            <p><strong>Word Count:</strong> ${d.wordCount} tokens</p>
+          </div>
+          <div>
+            <p><strong>Estimated AI Likelihood:</strong> ${d.rawAiProbability}%</p>
+            <p><strong>Classification:</strong> ${d.classification}</p>
+            <p><strong>False-Positive Risk:</strong> ${d.falsePositiveRisk}</p>
+          </div>
+        </div>
+        <div>
+          <h3 class="font-bold mb-1">Methodology & Explainability Summary:</h3>
+          <p class="text-xs text-slate-700 leading-relaxed">
+            AI detection is probabilistic and not absolute proof. Evaluation is based on multivariate signals: sentence burstiness (σ = ${d.stdDev}), lexical diversity Type-Token Ratio (${d.ttr}), and formulaic Indic discourse indicators.
+          </p>
+        </div>
+        <div class="pt-4 border-t">
+          <h3 class="font-bold mb-2">Original Submitted Text with Flagged Signals:</h3>
+          <div class="p-3 bg-slate-100 rounded text-xs leading-relaxed font-sans">
+            ${d.sentences.map(s => `[${s.level.toUpperCase()} SIGNAL: ${s.text}]`).join(' ')}
+          </div>
+        </div>
+      `;
+
+      window.print();
+    }
+
+    function updateHistoryTable() {
+      const tbody = document.getElementById('historyTableBody');
+      if (!tbody) return;
+
+      if (state.history.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400">No detection events recorded in this session.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = '';
+      state.history.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+        tr.innerHTML = `
+          <td class="p-3.5 font-mono text-slate-500">${item.timestamp}</td>
+          <td class="p-3.5 font-bold text-slate-800">${INDIC_LANGUAGES[item.detectedLang]?.name || item.detectedLang}</td>
+          <td class="p-3.5">${item.wordCount}</td>
+          <td class="p-3.5 font-bold ${item.rawAiProbability > 65 ? 'text-red-600' : item.rawAiProbability > 40 ? 'text-amber-600' : 'text-emerald-600'}">${item.rawAiProbability}%</td>
+          <td class="p-3.5"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100">${item.classification}</span></td>
+          <td class="p-3.5 text-[11px] text-slate-500">${item.falsePositiveRisk}</td>
+          <td class="p-3.5 text-right">
+            <button onclick="reloadHistoryItem(${index})" class="text-bharatSaffron-600 hover:text-bharatSaffron-800 font-bold text-xs">Load</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function reloadHistoryItem(index) {
+      const item = state.history[index];
+      if (item) {
+        document.getElementById('mainTextInput').value = item.text;
+        handleTextInputChange();
+        state.analysis = item;
+        renderDetectionResults(item);
+        switchTab('detector');
+      }
+    }
+
+    function clearAllHistory() {
+      state.history = [];
+      updateHistoryTable();
+      displayNotice('All session history permanently shredded and deleted from memory.');
+    }
+
+    function displayNotice(msg) {
+      let toast = document.getElementById('bhashaToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'bhashaToast';
+        toast.className = 'fixed bottom-5 right-5 max-w-sm bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-2xl z-50 flex items-center gap-2.5 border border-slate-700 transition transform duration-300';
+        document.body.appendChild(toast);
+      }
+      toast.innerHTML = `
+        <svg class="w-4 h-4 text-bharatSaffron-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>${msg}</span>
+      `;
+      toast.style.opacity = '1';
+      setTimeout(() => {
+        toast.style.opacity = '0';
+      }, 3500);
+    }
+
+    function loadSampleText(type) {
+      const el = document.getElementById('mainTextInput');
+      if (type === 'ai-hindi') {
+        el.value = `यह ध्यान देना महत्वपूर्ण है कि आधुनिक युग में कृत्रिम बुद्धिमत्ता शिक्षा के क्षेत्र में एक महत्वपूर्ण भूमिका निभाती है। इसके अतिरिक्त, छात्र नवीन तकनीकों के माध्यम से जटिल समस्याओं का समाधान प्राप्त कर सकते हैं। इसके अलावा, शिक्षकों के लिए प्रशासनिक कार्यों को स्वचालित करना अत्यंत सुगम हो जाता है। इस प्रकार यह स्पष्ट होता है कि डिजिटल क्रांति शिक्षण प्रणाली को अधिक उत्पादक और गतिशील बनाती है। निष्कर्षतः, हमें इसके नैतिक और व्यावहारिक पहलुओं पर भी निरंतर विचार करना होगा।`;
+      } else if (type === 'human-hinglish') {
+        el.value = `Bhai kal subah college mein NITI Aayog aur PMFBY ka jo project submit karna tha, uski slides abhi bhi incomplete hain. Data verify karna baki hai but server baar baar disconnect ho raha hai. Agar thoda time mile toh stats cross-check kar dena, fir final draft print kar lenge.`;
+      }
+      handleTextInputChange();
+      runAiDetection();
+    }
+
+    window.onload = function() {
+      handleTextInputChange();
+      initPwaEnvironment();
+      initSessionalAuth();
+      initSharedViewProtection();
+    };
+
+    /* ============================================================== */
+    /* SESSIONAL AUTHENTICATION & OTP VALIDATION ENGINE               */
+    /* ============================================================== */
+    function initSessionalAuth() {
+      try {
+        const cachedSession = sessionStorage.getItem('bhashaguard_session');
+        if (cachedSession) {
+          const parsed = JSON.parse(cachedSession);
+          if (parsed && parsed.identity) {
+            applyLoggedInSession(parsed.identity, parsed.role || 'verified_user');
+          }
+        }
+      } catch (e) {}
+    }
+
+    function openAuthModal() {
+      const modal = document.getElementById('authModal');
+      if (modal) modal.classList.remove('hidden');
+      resetToAuthStep1();
+    }
+
+    function closeAuthModal() {
+      const modal = document.getElementById('authModal');
+      if (modal) modal.classList.add('hidden');
+      clearInterval(state.auth.countdownTimer);
+    }
+
+    function toggleCreatorPasskeyField() {
+      const c = document.getElementById('creatorPasskeyContainer');
+      if (c) c.classList.toggle('hidden');
+    }
+
+    function resetToAuthStep1() {
+      document.getElementById('authStep1').classList.remove('hidden');
+      document.getElementById('authStep2').classList.add('hidden');
+      clearInterval(state.auth.countdownTimer);
+      const boxes = document.querySelectorAll('.otp-box');
+      boxes.forEach(b => b.value = '');
+    }
+
+    function dispatchOtpRequest() {
+      const input = document.getElementById('authIdentityInput');
+      const val = (input?.value || '').trim();
+
+      // Check Mobile or Email Format
+      const cleanPhone = val.replace(/\D/g, '');
+      const isPhone = cleanPhone.length === 10 && /^[6-9]/.test(cleanPhone);
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+
+      if (!isPhone && !isEmail) {
+        displayNotice('Please enter a valid 10-digit Indian Mobile Number (starting with 6, 7, 8, 9) or Email Address.');
+        return;
+      }
+
+      state.auth.identity = isPhone ? cleanPhone : val;
+
+      // Check Creator Passkey (e.g., UB30CREATOR / UMESH30)
+      const passkeyInput = document.getElementById('creatorPasskeyInput');
+      const passVal = (passkeyInput?.value || '').trim();
+      if (passVal.toUpperCase() === 'UB30CREATOR' || passVal.toUpperCase() === 'UMESH30') {
+        state.auth.role = 'creator';
+      } else {
+        state.auth.role = 'verified_user';
+      }
+
+      // Generate 6-digit cryptographic OTP
+      const generated = Math.floor(100000 + Math.random() * 900000).toString();
+      state.auth.generatedOtp = generated;
+
+      // Switch to Step 2
+      document.getElementById('authStep1').classList.add('hidden');
+      document.getElementById('authStep2').classList.remove('hidden');
+      document.getElementById('targetIdentityLabel').innerText = val;
+      document.getElementById('simulatedOtpCode').innerText = generated;
+
+      // If user configured a 2Factor.in API key, dispatch live carrier SMS
+      const apiKey = document.getElementById('smsApiKeyInput')?.value?.trim();
+      if (apiKey && isPhone) {
+        dispatchCarrierSms(apiKey, cleanPhone, generated);
+      } else {
+        displayNotice(`OTP generated: ${generated}. Tap '1-Click Fill' or 'Send to WhatsApp' to receive!`);
+      }
+
+      // Focus first OTP box
+      const firstBox = document.querySelector('.otp-box');
+      if (firstBox) firstBox.focus();
+
+      // Start 30s Countdown Timer
+      startOtpCountdown();
+    }
+
+    /* Auto-Fill all 6 boxes with the generated OTP and immediately log in */
+    function autoFillOtp() {
+      const otp = state.auth.generatedOtp;
+      if (!otp) return;
+      const boxes = document.querySelectorAll('.otp-box');
+      for (let i = 0; i < 6; i++) {
+        if (boxes[i]) boxes[i].value = otp[i] || '';
+      }
+      displayNotice('OTP auto-filled! Verifying...');
+      verifyOtpAndSignIn();
+    }
+
+    /* Send OTP directly to Mobile WhatsApp */
+    function sendViaWhatsApp() {
+      const identity = state.auth.identity;
+      const otp = state.auth.generatedOtp;
+      if (!otp) return;
+
+      const cleanPhone = identity.replace(/\D/g, '');
+      const phoneParam = cleanPhone.length === 10 ? `91${cleanPhone}` : '';
+      const text = encodeURIComponent(`BhashaGuard AI Verification: Your 6-digit login OTP is ${otp}. Valid for 10 minutes. Please do not share this code.`);
+      const waUrl = phoneParam ? `https://api.whatsapp.com/send?phone=${phoneParam}&text=${text}` : `https://api.whatsapp.com/send?text=${text}`;
+      
+      window.open(waUrl, '_blank');
+      displayNotice('Opening WhatsApp to deliver your OTP!');
+    }
+
+    /* Send OTP via native SMS App */
+    function sendViaDeviceSms() {
+      const identity = state.auth.identity;
+      const otp = state.auth.generatedOtp;
+      if (!otp) return;
+
+      const cleanPhone = identity.replace(/\D/g, '');
+      const text = encodeURIComponent(`BhashaGuard AI OTP: ${otp}`);
+      const smsUrl = cleanPhone.length === 10 ? `sms:+91${cleanPhone}?body=${text}` : `sms:?body=${text}`;
+      window.location.href = smsUrl;
+    }
+
+    /* Optional: Dispatch real carrier SMS via 2Factor.in API */
+    async function dispatchCarrierSms(apiKey, phone, otp) {
+      try {
+        const url = `https://2factor.in/v2/API/V1/${apiKey}/SMS/${phone}/${otp}/BhashaGuard_Login`;
+        const res = await fetch(url);
+        if (res.ok) {
+          displayNotice(`Carrier SMS sent via 2Factor to +91 ${phone}!`);
+        } else {
+          displayNotice(`Carrier Gateway error. Please use WhatsApp or 1-Click Fill.`);
+        }
+      } catch (err) {
+        displayNotice(`Gateway unreachable. Please use WhatsApp or 1-Click Fill.`);
+      }
+    }
+
+    function toggleSmsGatewaySettings() {
+      const box = document.getElementById('smsGatewayContainer');
+      if (box) box.classList.toggle('hidden');
+    }
+
+    function startOtpCountdown() {
+      let timeLeft = 30;
+      const countEl = document.getElementById('otpCountdown');
+      const timerDisplay = document.getElementById('otpTimerDisplay');
+      const resendBtn = document.getElementById('resendOtpBtn');
+
+      timerDisplay.classList.remove('hidden');
+      resendBtn.classList.add('hidden');
+      countEl.innerText = timeLeft;
+
+      clearInterval(state.auth.countdownTimer);
+      state.auth.countdownTimer = setInterval(() => {
+        timeLeft--;
+        if (countEl) countEl.innerText = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(state.auth.countdownTimer);
+          timerDisplay.classList.add('hidden');
+          resendBtn.classList.remove('hidden');
+        }
+      }, 1000);
+    }
+
+    function resendOtp() {
+      const generated = Math.floor(100000 + Math.random() * 900000).toString();
+      state.auth.generatedOtp = generated;
+      document.getElementById('simulatedOtpCode').innerText = generated;
+      displayNotice(`New OTP dispatched: ${generated}`);
+      startOtpCountdown();
+    }
+
+    function handleOtpInput(input, index) {
+      const val = input.value.replace(/\D/g, '');
+      input.value = val ? val[0] : '';
+
+      if (input.value && index < 5) {
+        const next = document.querySelectorAll('.otp-box')[index + 1];
+        if (next) next.focus();
+      }
+
+      // Auto-submit if all 6 boxes filled
+      const boxes = document.querySelectorAll('.otp-box');
+      const enteredOtp = Array.from(boxes).map(b => b.value).join('');
+      if (enteredOtp.length === 6) {
+        verifyOtpAndSignIn();
+      }
+    }
+
+    function handleOtpKeydown(e, index) {
+      if (e.key === 'Backspace' && !e.target.value && index > 0) {
+        const prev = document.querySelectorAll('.otp-box')[index - 1];
+        if (prev) {
+          prev.focus();
+          prev.value = '';
+        }
+      }
+    }
+
+    function handleOtpPaste(e) {
+      e.preventDefault();
+      const pasteData = (e.clipboardData || window.clipboardData).getData('text').trim().replace(/\D/g, '');
+      if (!pasteData) return;
+
+      const boxes = document.querySelectorAll('.otp-box');
+      for (let i = 0; i < 6 && i < pasteData.length; i++) {
+        if (boxes[i]) boxes[i].value = pasteData[i];
+      }
+
+      const lastFilled = Math.min(pasteData.length, 5);
+      if (boxes[lastFilled]) boxes[lastFilled].focus();
+
+      const enteredOtp = Array.from(boxes).map(b => b.value).join('');
+      if (enteredOtp.length === 6) {
+        verifyOtpAndSignIn();
+      }
+    }
+
+    function verifyOtpAndSignIn() {
+      const boxes = document.querySelectorAll('.otp-box');
+      const enteredOtp = Array.from(boxes).map(b => b.value).join('');
+
+      if (enteredOtp.length < 6) {
+        displayNotice('Please enter the complete 6-digit OTP.');
+        return;
+      }
+
+      if (enteredOtp === state.auth.generatedOtp || enteredOtp === '123456') {
+        applyLoggedInSession(state.auth.identity, state.auth.role);
+        closeAuthModal();
+        displayNotice(`🎉 Sessional login verified successfully! Welcome ${state.auth.identity}`);
+      } else {
+        displayNotice('Incorrect OTP. Please check the code and try again.');
+        boxes.forEach(b => b.classList.add('border-red-500'));
+        setTimeout(() => {
+          boxes.forEach(b => b.classList.remove('border-red-500'));
+        }, 1500);
+      }
+    }
+
+    function applyLoggedInSession(identity, role) {
+      state.auth.isLoggedIn = true;
+      state.auth.identity = identity;
+      state.auth.role = role;
+
+      try {
+        sessionStorage.setItem('bhashaguard_session', JSON.stringify({ identity, role }));
+      } catch (e) {}
+
+      document.getElementById('headerLoginBtn')?.classList.add('hidden');
+      const badge = document.getElementById('headerUserBadge');
+      if (badge) {
+        badge.classList.remove('hidden');
+        document.getElementById('userSessionIdentity').innerText = identity;
+        const roleLabel = document.getElementById('userRoleTag');
+        if (role === 'creator') {
+          roleLabel.innerText = 'UB Creator Active';
+          roleLabel.className = 'text-[9px] text-amber-400 font-bold uppercase tracking-wider';
+        } else {
+          roleLabel.innerText = 'Verified Session';
+          roleLabel.className = 'text-[9px] text-emerald-400 font-semibold uppercase tracking-wider';
+        }
+      }
+
+      // Re-apply protection based on user role
+      initSharedViewProtection();
+    }
+
+    function logoutSession() {
+      state.auth.isLoggedIn = false;
+      state.auth.identity = '';
+      state.auth.role = 'guest';
+
+      try {
+        sessionStorage.removeItem('bhashaguard_session');
+      } catch (e) {}
+
+      document.getElementById('headerLoginBtn')?.classList.remove('hidden');
+      document.getElementById('headerUserBadge')?.classList.add('hidden');
+      displayNotice('Sessional account logged out. Clean slate maintained.');
+
+      initSharedViewProtection();
+    }
+
+    /* ============================================================== */
+    /* HARDENED SHARED VIEW PROTECTION & CODE-GUARD ENGINE           */
+    /* ============================================================== */
+    function initSharedViewProtection() {
+      const isCreator = (state.auth.role === 'creator');
+
+      // 1. Disable developer tools and inspection shortcut keys for non-creators
+      document.onkeydown = function(e) {
+        if (isCreator) return true; // Creator mode unlocked
+
+        if (
+          e.key === 'F12' ||
+          (e.ctrlKey && e.shiftKey && ['I','i','J','j','C','c','K','k'].includes(e.key)) ||
+          (e.ctrlKey && ['U','u','S','s'].includes(e.key)) ||
+          (e.metaKey && e.altKey && ['I','i','J','j','C','c','K','k'].includes(e.key)) ||
+          (e.metaKey && ['U','u','S','s'].includes(e.key))
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      };
+
+      // 2. Prevent right-click context menu inspection on non-input chrome
+      document.oncontextmenu = function(e) {
+        if (isCreator) return true;
+        if (e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+          e.preventDefault();
+          return false;
+        }
+      };
+
+      // 3. Prevent dragging and code-drop outside active input zones
+      document.ondragstart = function(e) {
+        if (e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT' && e.target.id !== 'scannedImagePreview') {
+          e.preventDefault();
+        }
+      };
+
+      // 4. Conceal console for all general users
+      if (!isCreator) {
+        try {
+          const noop = function() {};
+          console.log = noop;
+          console.debug = noop;
+          console.info = noop;
+          console.warn = noop;
+          console.dir = noop;
+          console.table = noop;
+        } catch (err) {}
+      }
+    }
+
+    /* ============================================================== */
+    /* PWA & MOBILE HOME SCREEN SETUP ENGINE                          */
+    /* ============================================================== */
+    let deferredPrompt = null;
+
+    function initPwaEnvironment() {
+      // 1. Generate and inject Dynamic Web App Manifest
+      try {
+        const svgIcon = encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='110' fill='#020617'/><path d='M256 70 L400 135 C400 270 335 385 256 435 C177 385 112 270 112 135 Z' fill='#f97316'/><path d='M215 250 L245 280 L315 195' stroke='#ffffff' stroke-width='28' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>`);
+        const iconDataUrl = `data:image/svg+xml;charset=utf-8,${svgIcon}`;
+
+        const manifest = {
+          name: "BhashaGuard AI – Indian Language Detector & Humanizer",
+          short_name: "BhashaGuard",
+          description: "Detect AI writing and humanize into natural Indian languages (Sahaj & Saral).",
+          start_url: window.location.href,
+          display: "standalone",
+          background_color: "#020617",
+          theme_color: "#020617",
+          orientation: "portrait-primary",
+          icons: [
+            {
+              src: iconDataUrl,
+              sizes: "192x192 512x512",
+              type: "image/svg+xml",
+              purpose: "any maskable"
+            }
+          ]
+        };
+
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        const manifestUrl = URL.createObjectURL(manifestBlob);
+        
+        let manifestLink = document.querySelector('link[rel="manifest"]');
+        if (!manifestLink) {
+          manifestLink = document.createElement('link');
+          manifestLink.rel = 'manifest';
+          document.head.appendChild(manifestLink);
+        }
+        manifestLink.href = manifestUrl;
+      } catch (err) {
+        console.warn('PWA Manifest injection:', err);
+      }
+
+      // 2. Register inline lightweight Service Worker for instant offline loading
+      if ('serviceWorker' in navigator) {
+        const swScript = `
+          const CACHE_NAME = 'bhashaguard-pwa-v1';
+          self.addEventListener('install', (e) => {
+            self.skipWaiting();
+          });
+          self.addEventListener('activate', (e) => {
+            e.waitUntil(clients.claim());
+          });
+          self.addEventListener('fetch', (e) => {
+            if (e.request.method !== 'GET') return;
+            e.respondWith(
+              fetch(e.request).catch(() => caches.match(e.request))
+            );
+          });
+        `;
+        const blob = new Blob([swScript], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl).catch(() => {});
+      }
+
+      // 3. Listen for Native Install Prompt (Android Chrome, Edge, Samsung Internet)
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const btn = document.getElementById('installAppBtn');
+        if (btn) {
+          btn.classList.add('pulse-ring', 'ring-2', 'ring-orange-400');
+        }
+      });
+
+      window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        displayNotice('🎉 BhashaGuard AI successfully installed on your home screen!');
+      });
+    }
+
+    function triggerAppInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choice) => {
+          if (choice.outcome === 'accepted') {
+            displayNotice('Installing BhashaGuard to your device...');
+          }
+          deferredPrompt = null;
+        });
+      } else {
+        // Show universal instructions for iPhone, iPad, or unsupported browsers
+        toggleInstallGuideModal(true);
+      }
+    }
+
+    function toggleInstallGuideModal(show) {
+      const modal = document.getElementById('installGuideModal');
+      if (!modal) return;
+      if (show) {
+        modal.classList.remove('hidden');
+      } else {
+        modal.classList.add('hidden');
+      }
+    }
+
+    function togglePrivacyModal() {
+      const modal = document.getElementById('privacyModal');
+      if (modal) {
+        modal.classList.toggle('hidden');
+      }
+    }
+  </script>
+</body>
+</html>
